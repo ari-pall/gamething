@@ -1,0 +1,9 @@
+/.lsp/
+/.clj-kondo/
+/.projectile
+/.shadow-cljs/
+/node_modules/
+/package-lock.json
+/.dir-locals.el
+/js/cljs-runtime/
+/output/
