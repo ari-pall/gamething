@@ -21,6 +21,7 @@
                 [com.pitch/uix.dom "0.6.2"]
                 [minicosm "0.1.6"]
                 [rum "0.12.9"]
+                [cjohansen/dumdom "2022.09.15"]
                 ]
  :dev-http {8280 "resources/public/"}
  :builds {:app {:target     :browser ;; https://shadow-cljs.github.io/docs/UsersGuide.html#target-browser

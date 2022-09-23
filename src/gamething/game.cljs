@@ -8,6 +8,7 @@
    ;; [spade.runtime]
    [reagent.dom :as rdom]
    [gamething.db :as db]
+   [gamething.prototypes :as p]
    [day8.re-frame.tracing :refer-macros [fn-traced]]
    [schema.core :as s :include-macros true]
    [uix.core :refer [defui $]]
@@ -100,8 +101,7 @@
      ^{:key id} [:button.rounded-full.bg-gray-300.hover:bg-green-300.py-1
                  {:on-click  #(try-to-buy id)}
                  (str (kw->str 1 id) " for " price " moneys")])])
-(defsub all [db] (str db))
-;; (reg-sub :all (fn [db _] (str db)))
+(defsub all str)
 (defevent mouse-down-on-card [db k arg]
   (-> db
       (assoc-in [:drag :held-card] k)
@@ -116,9 +116,6 @@
     db))
 (defsub cards :cards)
 (defsub card [k] [[cards] [(cards)]] (cards k))
-;; @(card 0)
-;; (reg-sub :card (fn [db [_ k]] (get-in db [:cards k])))
-
 (defsub cards-view [] [[cards] [(cards)]]
   [:div.select-none.overflow-hidden
    (doall (for [[k card] cards]
@@ -159,8 +156,30 @@
                 e])])
 (defsub garden [] [_ [(none)]]
   [:p.text-3xl "garden"])
+(defn hash-set-conj [set new]
+  (conj (or set #{}) new))
+(defn spawn-entity [{:keys [entity-count] :as db} entity entity-pos]
+  (reduce (fn [db [c v]]) db entity))
+(defn spawn-tile [db tile-entity tile-entity-pos]
+  (reduce (fn [db [c v]]) db tile-entity))
+(defsub player-pos [db] (let [[player-id _] (first (get-in db [:c->e->v :player]))]
+                          (get-in db [:c->e->v :pos player-id])))
 (def view-radius 10)
 (def level-radius 30)
+
+(defn prob [p] (> p (rand)))
+
+
+;; (defn generate-level [db]
+;;   (assoc db :entity-count 0
+;;          :c->e->v (reduce f {} ))
+;;   (assoc (zipmap (for [x (range (- level-radius) (inc level-radius))
+;;                        y (range (- level-radius) (inc level-radius))]
+;;                    [x y])
+;;                  (map #(rand-nth [:wall :wall :wall :wall :wall :wall :floor :floor :floor :floor :floor :loot])
+;;                       (range)))
+;;          [0 0] :player)
+;;   )
 (defn generate-cave-level [{:keys [level current-dir move-dir pos] :as cave}]
   (-> cave
       (assoc :pos [0 0])
@@ -238,13 +257,23 @@
         ]
     db))
 (def grid-side-length (inc (* 2 view-radius)))
-;; (def blank-grid (mapv #(mapv (constantly " ") (range grid-side-length)) (range grid-side-length)))
+;; (defsub world-view [] [[c->e->v pos] [(sget [:c->e->v]) (player-pos)]]
+;;   [:div.grid.aspect-square.text-xl.select-none.m-4
+;;    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
+;;    (doall (for [y (map - (range (- view-radius) (inc view-radius)))
+;;                 x (range (- view-radius) (inc view-radius))]
+;;             ^{:key [x y]} [:p (case (level (vec+ pos [x y]))
+;;                                 :player player-emoji
+;;                                 :wall   "#"
+;;                                 :loot   "💰"
+;;                                 " ")]))])
 (defsub cave-view [] [[{:keys [level pos player-emoji]}] [(sget [:cave])]]
-  [:div.grid.aspect-square.text-xl.select-none.m-4
+  [:div.grid.aspect-square.text-3xl.select-none.m-4
    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
    (doall (for [y (map - (range (- view-radius) (inc view-radius)))
                 x (range (- view-radius) (inc view-radius))]
-            ^{:key [x y]} [:p (case (level (vec+ pos [x y]))
+            ^{:key [x y]} [:p.bg-orange-500  ;; {:class (str "bg-orange-" (rand-nth ["200" "400" "600" ]))}
+ (case (level (vec+ pos [x y]))
                                 :player player-emoji
                                 :wall   "#"
                                 :loot   "💰"
