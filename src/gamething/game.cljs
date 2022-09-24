@@ -10,12 +10,13 @@
    [gamething.db :as db]
    [gamething.prototypes :as p]
    [day8.re-frame.tracing :refer-macros [fn-traced]]
-   [schema.core :as s :include-macros true]
-   [uix.core :refer [defui $]]
-   [uix.dom]
-   [minicosm.core :refer [start!]]
-   [minicosm.ddn :refer [render-to-canvas]]
-   [rum.core :as rum :refer [defc reactive react]]
+   ;; [schema.core :as s :include-macros true]
+   ;; [uix.core :refer [defui $]]
+   ;; [uix.dom]
+   [stylo.core :refer [c]]
+   ;; [minicosm.core :refer [start!]]
+   ;; [minicosm.ddn :refer [render-to-canvas]]
+   ;; [rum.core :as rum :refer [defc reactive react]]
    )
   (:require-macros [gamething.macros :refer [defsub defevent]]))
 
@@ -164,9 +165,12 @@
                                 (assoc entity :pos entity-pos)))
       (update-in [:c->e->v :tile entity-pos :contents] hash-set-conj entity-count)
       (update :entity-count inc)))
+
+;; (stylo.core/c? :objeca 2)
+;; (c :bk)
 (defn create-tile [{:keys [c->e->v] :as db} {:keys [tile]} tile-pos]
-  (let [{:keys [type color name char]} tile]
-    (assert color (str "tile " tile " must have a color"))
+  (let [{:keys [type bg-color]} tile]
+    (assert (and type bg-color) (str "tile " tile " must have a color and type"))
     (assoc-in db [:c->e->v :tile tile-pos] (assoc tile :contents #{}))))
 (def view-radius 15)
 (def level-radius 70)
@@ -310,40 +314,32 @@
 (defn entity-components [c->e->v e cs]
   (map #(% e) (map c->e->v cs) ))
 (defsub tile-visual-data [{:keys [c->e->v]} t]
-  (let [{:keys [color char contents]} (get-in c->e->v [:tile t])
-        entity-chars                  (component-values c->e->v :char contents)]
-    [color char contents entity-chars]))
-(defsub tile-visual [t] [[[color char contents entity-chars]] [(tile-visual-data t)]]
-  ^{:key t} [:p {:style {:background-color color}
+  (let [{:keys [bg-color contents]} (get-in c->e->v [:tile t])
+        chars                       (component-values c->e->v :char (hash-set-conj contents t))]
+    [bg-color chars]))
+(defsub tile-visual [t] [[[bg-color chars]] [(tile-visual-data t)]]
+  ^{:key t} [:p {:style         {:background-color bg-color}
                  :on-mouse-over #(mouse-over-tile t)}
-             (or char ",")
-             ])
-(def x 6)
-;; (def pos [0 0])
-;; (def posx 0)
-;; (def posy 0)
+             (rand-nth chars)])
 (def grid-side-length (inc (* 2 view-radius)))
-(defsub world-view [[posx posy]] [tile-visuals (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
-                                                     x (range (- posx view-radius) (+ 1 posx view-radius))]
-                                                 (tile-visual [x y]))]
-  [:div.grid.aspect-square.text-2xl.select-none.m-4
-   {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
-   (doall (seq tile-visuals))]
-  )
+;; (defsub world-view [[posx posy]] [tile-visuals (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
+;;                                                      x (range (- posx view-radius) (+ 1 posx view-radius))]
+;;                                                  (tile-visual [x y]))]
+;;   [:div.grid.aspect-square.text-2xl.select-none.m-4
+;;    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
+;;    (doall (seq tile-visuals))]
+;;   )
 
-;; (defn world-view []
-;;   (let [[posx posy] [(sget [:pos 0]) (sget [:pos 1])]]
-;;     (fn []
-;;       [:div.grid.aspect-square.text-3xl.select-none.m-4
-;;        {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
-;;        "a"
-;;        posx
-;;        posy
-;;        (doall (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
-;;                     x (range (- posx view-radius) (+ 1 posx view-radius))]
-;;                 (tile-visual [x y])))
-;;        ])
-;;     ))
+(defn world-view []
+  (let [[posx posy] [(sget [:pos 0]) (sget [:pos 1])]]
+    (fn []
+      [:div.grid.aspect-square.text-3xl.select-none.m-4
+       {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
+       (doall (for [y (reverse (range (- @posy view-radius) (+ 1 @posy view-radius)))
+                    x (range (- @posx view-radius) (+ 1 @posx view-radius))]
+                (tile-visual [x y])))
+       ])
+    ))
 (defsub cave-view [] [[{:keys [level pos player-emoji]}] [(sget [:cave])]]
   [:div.grid.aspect-square.text-3xl.select-none.m-4
    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
@@ -384,6 +380,7 @@
          :current-place place))
 (defsub description-popup [] [[text] [(sget [:popup-text])]]
   [:p text])
+;; (def sidebar-style (c :flex))
 (defsub sidebar [] [[places message-log-view] [(places) (message-log-view)]]
   [:div.flex.flex-col
    (for [place places]
@@ -402,7 +399,8 @@
    ;; [:p @(s :all)]
    [:div.w-72.flex-none ;; .overflow-hidden
     @(sidebar)]
-   [:div  @(world-view (get-player-pos @db)) ]
+   [:div ((world-view))]
+   ;; [:div  @(world-view (get-player-pos @db)) ]
    ;; @(@(current-place) )
    ;; (fn [] @(home) )
    ;; @(crafting-menu)

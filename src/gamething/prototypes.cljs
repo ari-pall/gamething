@@ -1,24 +1,27 @@
 (ns gamething.prototypes)
 
 
-(def wall {:tile {:type      :wall
-                  :color     "#717171"
-                  :char      "#"
-                  :name      "wall"
-                  }})
+(def wall {:tile {:type     :wall
+                  :bg-color "#717171"
+                  }
+           :name "wall"
+           :char "#"
+           })
+(def tree {:tile {:type     :wall
+                  :bg-color "#626B00"
+                  }
+           :name "tree"
+           :char "🌲"
+           })
+(def grass {:tile {:type     :floor
+                   :bg-color "#22B800"
+                   }
+            :name "grass"
+            })
 (def loot {:char     "💰"
            :name     "loot"
            :takeable true
            })
-(def tree {:tile {:type      :wall
-                  :color     "#626B00"
-                  :char      "🌲"
-                  :name      "tree"
-                  }})
-(def grass {:tile {:type      :floor
-                   :color     "#22B800"
-                   :name      "grass"
-                   }})
 (def player {:char   "😀"
              :name   "player"
              :player true
