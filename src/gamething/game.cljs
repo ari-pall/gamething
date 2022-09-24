@@ -158,28 +158,22 @@
   [:p.text-3xl "garden"])
 (defn hash-set-conj [set new]
   (conj (or set #{}) new))
-(defn spawn-entity [{:keys [entity-count] :as db} entity entity-pos]
-  (reduce (fn [db [c v]]) db entity))
-(defn spawn-tile [db tile-entity tile-entity-pos]
-  (reduce (fn [db [c v]]) db tile-entity))
+(defn create-entity [{:keys [entity-count c->e->v] :as db} entity entity-pos]
+  (-> db
+      (update :c->e->v #(reduce (fn [c->e->v [c v]]
+                                  (assoc-in c->e->v [c entity-count] v))
+                                %
+                                (assoc entity :pos entity-pos)))
+      (update-in [c->e->v :tile entity-pos :contents] hash-set-conj entity-count)
+      (update :entity-count inc)))
+(defn create-tile [{:keys [c->e->v] :as db} e {:keys [type color name char] :as tile} tile-pos]
+  (assert color (str "tile " tile " must have a color"))
+  (assoc-in c->e->v [:tile tile-pos] (assoc tile :contents #{})))
 (defsub player-pos [db] (let [[player-id _] (first (get-in db [:c->e->v :player]))]
                           (get-in db [:c->e->v :pos player-id])))
 (def view-radius 10)
 (def level-radius 30)
 
-(defn prob [p] (> p (rand)))
-
-
-;; (defn generate-level [db]
-;;   (assoc db :entity-count 0
-;;          :c->e->v (reduce f {} ))
-;;   (assoc (zipmap (for [x (range (- level-radius) (inc level-radius))
-;;                        y (range (- level-radius) (inc level-radius))]
-;;                    [x y])
-;;                  (map #(rand-nth [:wall :wall :wall :wall :wall :wall :floor :floor :floor :floor :floor :loot])
-;;                       (range)))
-;;          [0 0] :player)
-;;   )
 (defn generate-cave-level [{:keys [level current-dir move-dir pos] :as cave}]
   (-> cave
       (assoc :pos [0 0])
@@ -256,28 +250,50 @@
         db                                       (assoc db :cave cave)
         ]
     db))
+
+(defn prob [p] (> p (rand)))
+(defn component-values [c->e->v c es]
+  (map (c->e->v c) es))
+(defn entity-components [c->e->v e cs]
+  (map #(% e) (map c->e->v cs) ))
+(defsub tile-visual-data [{:keys [c->e->v]} t]
+  (let [{:keys [color char contents]} (get-in c->e->v [:tile t])
+        entity-chars                  (component-values c->e->v :char contents)]
+    [color char contents entity-chars]))
+(defsub tile-visual [t] [[[color char contents entity-chars]] [(tile-visual-data t)]]
+  ^{:key t} [:p]
+  )
+
+
+;; (defn generate-level [db]
+;;   (assoc db :entity-count 0
+;;          :c->e->v (reduce f {} ))
+;;   (assoc (zipmap (for [x (range (- level-radius) (inc level-radius))
+;;                        y (range (- level-radius) (inc level-radius))]
+;;                    [x y])
+;;                  (map #(rand-nth [:wall :wall :wall :wall :wall :wall :floor :floor :floor :floor :floor :loot])
+;;                       (range)))
+;;          [0 0] :player)
+;;   )
 (def grid-side-length (inc (* 2 view-radius)))
-;; (defsub world-view [] [[c->e->v pos] [(sget [:c->e->v]) (player-pos)]]
-;;   [:div.grid.aspect-square.text-xl.select-none.m-4
-;;    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
-;;    (doall (for [y (map - (range (- view-radius) (inc view-radius)))
-;;                 x (range (- view-radius) (inc view-radius))]
-;;             ^{:key [x y]} [:p (case (level (vec+ pos [x y]))
-;;                                 :player player-emoji
-;;                                 :wall   "#"
-;;                                 :loot   "💰"
-;;                                 " ")]))])
+(defsub world-view [[posx posy]] [tile-visuals (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
+                                                     x (range (- posx view-radius) (+ 1 posx view-radius))]
+                                                 (tile-visual [x y]))]
+  [:div.grid.aspect-square.text-xl.select-none.m-4
+   {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
+   (seq tile-visuals)])
 (defsub cave-view [] [[{:keys [level pos player-emoji]}] [(sget [:cave])]]
   [:div.grid.aspect-square.text-3xl.select-none.m-4
    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
    (doall (for [y (map - (range (- view-radius) (inc view-radius)))
                 x (range (- view-radius) (inc view-radius))]
             ^{:key [x y]} [:p.bg-orange-500  ;; {:class (str "bg-orange-" (rand-nth ["200" "400" "600" ]))}
- (case (level (vec+ pos [x y]))
-                                :player player-emoji
-                                :wall   "#"
-                                :loot   "💰"
-                                " ")]))])
+                           (case (level (vec+ pos [x y]))
+                             :player player-emoji
+                             :wall   "#"
+                             :loot   "💰"
+                             " ")]))])
+
 (defevent tick [db]
   (let [n (get-in db [:inventory :thing-maker])]
     (cond-> db
