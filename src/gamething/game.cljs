@@ -143,7 +143,8 @@
    ])
 (defevent set-emoji [db e]
   (-> db
-      (assoc-in [:cave :player-emoji] e)
+      (assoc :player-emoji e)
+      ;; (assoc-in [:cave :player-emoji] e)
       (add-message (str "You picked " e))))
 (defsub home [] [_ [(none)]]
   [:div.m-6.space-x-2.text-3xl
@@ -155,7 +156,6 @@
   [:p.text-3xl "garden"])
 (defn hash-set-conj [set new]
   (conj (or set #{}) new))
-@db
 (defn create-entity [{:keys [entity-count] :as db} entity entity-pos]
   (-> db
       (update :c->e->v #(reduce (fn [c->e->v [c v]]
@@ -168,9 +168,8 @@
   (let [{:keys [type color name char]} tile]
     (assert color (str "tile " tile " must have a color"))
     (assoc-in db [:c->e->v :tile tile-pos] (assoc tile :contents #{}))))
-@(sget [:pos])
-(def view-radius 11)
-(def level-radius 40)
+(def view-radius 15)
+(def level-radius 70)
 (defn prob [p] (> p (rand)))
 (defn generate-level [db]
   (-> (reduce (fn [db pos]
@@ -190,15 +189,15 @@
 ;;       (create-entity p/player [0 0])) :c->e->v)
 (defsub player-pos [db] (let [[player-id _] (first (get-in db [:c->e->v :player]))]
                           (get-in db [:c->e->v :pos player-id])))
-(defn generate-cave-level [{:keys [level current-dir move-dir pos] :as cave}]
-  (-> cave
-      (assoc :pos [0 0])
-      (assoc :level (assoc (zipmap (for [x (range (- level-radius) (inc level-radius))
-                                         y (range (- level-radius) (inc level-radius))]
-                                     [x y])
-                                   (map #(rand-nth [:wall :wall :wall :wall :wall :wall :floor :floor :floor :floor :floor :loot])
-                                        (range)))
-                           [0 0] :player))))
+;; (defn generate-cave-level [{:keys [level current-dir move-dir pos] :as cave}]
+;;   (-> cave
+;;       (assoc :pos [0 0])
+;;       (assoc :level (assoc (zipmap (for [x (range (- level-radius) (inc level-radius))
+;;                                          y (range (- level-radius) (inc level-radius))]
+;;                                      [x y])
+;;                                    (map #(rand-nth [:wall :wall :wall :wall :wall :wall :floor :floor :floor :floor :floor :loot])
+;;                                         (range)))
+;;                            [0 0] :player))))
 (defevent key-up [db key]
   (if-let [i (case key
                "a"          0
@@ -210,7 +209,7 @@
                "w"          1
                "ArrowUp"    1
                nil)]
-    (assoc-in db [:cave :current-dir i] 0)
+    (assoc-in db [:current-dir i] 0)
     db))
 (defevent key-down [db key]
   (if-let [[i val]
@@ -225,85 +224,87 @@
              "ArrowUp"    [1 1]
              nil)]
     (-> db
-        (assoc-in [:cave :move-dir i] val)
-        (assoc-in [:cave :current-dir i] val))
+        (assoc-in [:move-dir i] val)
+        (assoc-in [:current-dir i] val))
     db))
 (def diag-dirs {[1 1]   [[0 1] [1 0]]
                 [1 -1]  [[0 -1] [1 0]]
                 [-1 -1] [[0 -1] [-1 0]]
                 [-1 1]  [[0 1] [-1 0]]})
-(defn cave-movement [{:keys [cave] :as db}]
-  (let [{:keys [level current-dir move-dir pos]} cave
-        previous-coords                          pos
-        [destination-coords destination-tile]    (let [c (vec+ move-dir pos)
-                                                       t (level c)]
-                                                   (if (and (= :wall t) (diag-dirs move-dir))
-                                                     (let [c1 (vec+ ((diag-dirs move-dir) 0) pos)
-                                                           c2 (vec+ ((diag-dirs move-dir) 1) pos)
-                                                           t1 (level c1)
-                                                           t2 (level c2)]
-                                                       (if (= t1 t2 :wall)
-                                                         [c t]
-                                                         (rand-nth (filter #(not= :wall (% 1)) [[c1 t1] [c2 t2]]))))
-                                                     [c t]))
-        [db cave]
-        (case destination-tile
-          :wall   [db cave]
-          :player [db cave]
-          nil     [db cave]
-          :floor  [db (-> cave
-                          (assoc-in [:level previous-coords] :floor)
-                          (assoc-in [:level destination-coords] :player)
-                          (assoc-in [:pos] destination-coords))]
-          :loot   [(-> db
-                       (add-message "You found some loot")
-                       (update :inventory do-transaction {:loot 1}))
-                   (-> cave
-                       (assoc-in [:level previous-coords] :floor)
-                       (assoc-in [:level destination-coords] :player)
-                       (assoc-in [:pos] destination-coords))])
-        cave                                     (assoc cave :move-dir current-dir)
-        db                                       (assoc db :cave cave)
-        ]
-    db))
+;; (defn cave-movement [{:keys [cave] :as db}]
+;;   (let [{:keys [level current-dir move-dir pos]} cave
+;;         previous-coords                          pos
+;;         [destination-coords destination-tile]    (let [c (vec+ move-dir pos)
+;;                                                        t (level c)]
+;;                                                    (if (and (= :wall t) (diag-dirs move-dir))
+;;                                                      (let [c1 (vec+ ((diag-dirs move-dir) 0) pos)
+;;                                                            c2 (vec+ ((diag-dirs move-dir) 1) pos)
+;;                                                            t1 (level c1)
+;;                                                            t2 (level c2)]
+;;                                                        (if (= t1 t2 :wall)
+;;                                                          [c t]
+;;                                                          (rand-nth (filter #(not= :wall (% 1)) [[c1 t1] [c2 t2]]))))
+;;                                                      [c t]))
+;;         [db cave]
+;;         (case destination-tile
+;;           :wall   [db cave]
+;;           :player [db cave]
+;;           nil     [db cave]
+;;           :floor  [db (-> cave
+;;                           (assoc-in [:level previous-coords] :floor)
+;;                           (assoc-in [:level destination-coords] :player)
+;;                           (assoc-in [:pos] destination-coords))]
+;;           :loot   [(-> db
+;;                        (add-message "You found some loot")
+;;                        (update :inventory do-transaction {:loot 1}))
+;;                    (-> cave
+;;                        (assoc-in [:level previous-coords] :floor)
+;;                        (assoc-in [:level destination-coords] :player)
+;;                        (assoc-in [:pos] destination-coords))])
+;;         cave                                     (assoc cave :move-dir current-dir)
+;;         db                                       (assoc db :cave cave)
+;;         ]
+;;     db))
+;; (defn pick-up-item [{:keys [c->e->v] :as db} item]
+;;   )
+(defn entities-on-tile [{:keys [c->e->v] :as db} t]
+  (get-in c->e->v [:tile t :contents]))
 (defn get-player-id [{:keys [c->e->v] :as db}] (first (first (get-in c->e->v [:player]))))
 (defn get-player-pos [{:keys [c->e->v] :as db}] (get-in c->e->v [:pos (get-player-id db)]))
 ;; (get-player-pos @db)
+;; ( @db :move-dir)
 (defn world-movement [{:keys [c->e->v current-dir move-dir] :as db}]
-  (let [pos (get-player-pos db)
+  (let [player-id       (get-player-id db)
+        pos             (get-player-pos db)
         previous-coords pos
-        [destination-coords destination-type] (let [c (vec+ move-dir pos)
-                                                    t (get-in c->e->v [:tile c :type])]
-                                                   (if (and (= :wall t) (diag-dirs move-dir))
-                                                     (let [c1 (vec+ ((diag-dirs move-dir) 0) pos)
-                                                           c2 (vec+ ((diag-dirs move-dir) 1) pos)
-                                                           t1 (get-in c->e->v [:tile c1 :type])
-                                                           t2 (get-in c->e->v [:tile c2 :type])]
-                                                       (if (= t1 t2 :wall)
-                                                         [c t]
-                                                         (rand-nth (filter #(not= :wall (% 1)) [[c1 t1] [c2 t2]]))))
-                                                     [c t]))
-        db (case destination-type
-             :wall  db
-             nil    db
-             :floor  [db (-> cave
-                             (assoc-in [:level previous-coords] :floor)
-                             (assoc-in [:level destination-coords] :player)
-                             (assoc-in [:pos] destination-coords))]
-             :loot  [(-> db
-                          (add-message "You found some loot")
-                          (update :inventory do-transaction {:loot 1}))
-                      (-> cave
-                          (assoc-in [:level previous-coords] :floor)
-                          (assoc-in [:level destination-coords] :player)
-                          (assoc-in [:pos] destination-coords))])
-        cave                                  (assoc cave :move-dir current-dir)
-        db                                    (assoc db :cave cave)
+        [destination destination-type]
+        (let [c (vec+ move-dir pos)
+              t (get-in c->e->v [:tile c :type])]
+          (if (and (= :wall t) (diag-dirs move-dir))
+            (let [c1 (vec+ ((diag-dirs move-dir) 0) pos)
+                  c2 (vec+ ((diag-dirs move-dir) 1) pos)
+                  t1 (get-in c->e->v [:tile c1 :type])
+                  t2 (get-in c->e->v [:tile c2 :type])]
+              (if (= t1 t2 :wall)
+                [c t]
+                (rand-nth (filter #(not= :wall (% 1)) [[c1 t1] [c2 t2]]))))
+            [c t]))
         ]
-    db))
+    (-> (case destination-type
+          :wall  db
+          nil    db
+          :floor (assoc db :c->e->v (-> c->e->v
+                                        (update-in [:tile pos :contents] disj player-id)
+                                        (update-in [:tile destination :contents] hash-set-conj player-id)
+                                        ;; (add-message (str "player moved to " destination))
+                                        (assoc-in [:pos player-id] destination))))
+        (assoc :move-dir current-dir))))
 
-(defevent mouse-over-tile [db t]
-  (assoc db :popup-text (get-in db [:c->e->v :tile t :name])))
+(defevent mouse-over-tile [{:keys [c->e->v] :as db} t]
+  (-> db
+      (add-message (str (get-in c->e->v [:tile t :char])
+                        " that's a " (get-in c->e->v [:tile t :name])))
+      (assoc db :popup-text (get-in c->e->v [:tile t :name]))))
 (defn component-values [c->e->v c es]
   (map (c->e->v c) es))
 (defn entity-components [c->e->v e cs]
@@ -315,20 +316,17 @@
 (defsub tile-visual [t] [[[color char contents entity-chars]] [(tile-visual-data t)]]
   ^{:key t} [:p {:style {:background-color color}
                  :on-mouse-over #(mouse-over-tile t)}
-             (or char " ")
+             (or char ",")
              ])
-
-
-
-
-(def pos [0 0])
-(def posx 0)
-(def posy 0)
+(def x 6)
+;; (def pos [0 0])
+;; (def posx 0)
+;; (def posy 0)
 (def grid-side-length (inc (* 2 view-radius)))
 (defsub world-view [[posx posy]] [tile-visuals (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
                                                      x (range (- posx view-radius) (+ 1 posx view-radius))]
                                                  (tile-visual [x y]))]
-  [:div.grid.aspect-square.text-3xl.select-none.m-4
+  [:div.grid.aspect-square.text-2xl.select-none.m-4
    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
    (doall (seq tile-visuals))]
   )
@@ -361,8 +359,9 @@
 (defevent tick [db]
   (let [n (get-in db [:inventory :thing-maker])]
     (cond-> db
-      (pos? n)                      (update :inventory do-transaction {:thing n})
-      (= :cave (db :current-place)) (cave-movement)
+      (pos? n) (update :inventory do-transaction {:thing n})
+      true     (world-movement)
+      ;; (= :cave (db :current-place)) (cave-movement)
       ;; (->
       ;; (cave-movement)
       ;; (update :cave make-tiles))
@@ -379,11 +378,11 @@
     :cave      cave-view
     ))
 (defevent go-to-place [db place]
-  (assoc (if (= place :cave)
-           (update db :cave generate-cave-level)
-           db)
+  (assoc db ;; (if (= place :cave)
+         ;;   (update db :cave generate-cave-level)
+         ;;   db)
          :current-place place))
-(defsub description-popup [db] [[text] [(sget [:popup-text])]]
+(defsub description-popup [] [[text] [(sget [:popup-text])]]
   [:p text])
 (defsub sidebar [] [[places message-log-view] [(places) (message-log-view)]]
   [:div.flex.flex-col
@@ -393,9 +392,10 @@
                     (kw->str place)])
    message-log-view]
   )
+(def aa 43)
 (defn view []
   ;; [:title "aaaaaaaaaaaaa"]
-  [:div.h-screen.w-screen.flex.flex-row.bg-gray-600.font-mono.text-blue-400.text-lg.overflow-hidden
+  [:div.h-screen.w-screen.flex.flex-row.bg-gray-600.font-mono.text-red-200.text-lg.overflow-hidden
    {:onMouseUp     #(mouse-up)
     :on-mouse-move #(mouse-move %1)
     }
