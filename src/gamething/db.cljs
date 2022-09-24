@@ -18,6 +18,7 @@
    :drag          {:held-card              nil
                    :held-card-relative-pos [nil nil]
                    }
+   :popup-text nil
    :factory       {:view-offest              [0 0]
                    :held-object              nil
                    :held-object-relative-pos [nil nil]
@@ -29,7 +30,8 @@
                                                  :connects [1 0]}
                                               }}
    :entity-count 0
-   :c->e->v      {:tile-contents {}}
+   :c->e->v      {}
+   ;; :pos          [0 0]
    :current-dir  [0 0]
    :move-dir     [0 0]
    :cave          {:level        nil

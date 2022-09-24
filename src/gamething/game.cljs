@@ -27,9 +27,6 @@
 (defn do-transaction [inv t] (merge-with + inv t))
 
 (def db re-frame.db/app-db)
-(defevent init [_] db/default-db ;; (fn-traced [_ _]
-                          ;; db/default-db)
-  )
 ;; (reg-event-db :init (fn-traced [_ _]
 ;;                                db/default-db))
 
@@ -158,22 +155,41 @@
   [:p.text-3xl "garden"])
 (defn hash-set-conj [set new]
   (conj (or set #{}) new))
-(defn create-entity [{:keys [entity-count c->e->v] :as db} entity entity-pos]
+@db
+(defn create-entity [{:keys [entity-count] :as db} entity entity-pos]
   (-> db
       (update :c->e->v #(reduce (fn [c->e->v [c v]]
                                   (assoc-in c->e->v [c entity-count] v))
                                 %
                                 (assoc entity :pos entity-pos)))
-      (update-in [c->e->v :tile entity-pos :contents] hash-set-conj entity-count)
+      (update-in [:c->e->v :tile entity-pos :contents] hash-set-conj entity-count)
       (update :entity-count inc)))
-(defn create-tile [{:keys [c->e->v] :as db} e {:keys [type color name char] :as tile} tile-pos]
-  (assert color (str "tile " tile " must have a color"))
-  (assoc-in c->e->v [:tile tile-pos] (assoc tile :contents #{})))
+(defn create-tile [{:keys [c->e->v] :as db} {:keys [tile]} tile-pos]
+  (let [{:keys [type color name char]} tile]
+    (assert color (str "tile " tile " must have a color"))
+    (assoc-in db [:c->e->v :tile tile-pos] (assoc tile :contents #{}))))
+@(sget [:pos])
+(def view-radius 11)
+(def level-radius 40)
+(defn prob [p] (> p (rand)))
+(defn generate-level [db]
+  (-> (reduce (fn [db pos]
+                (if (prob 0.1)
+                  (create-tile db p/tree pos)
+                  (create-tile db p/grass pos)))
+              db
+              (for [x (range (- level-radius) (inc level-radius))
+                    y (range (- level-radius) (inc level-radius))]
+                [x y]))
+      (assoc :entity-count 0)
+      (create-tile p/grass [0 0])
+      (create-entity p/player [0 0])))
+;; ( (-> @db
+;;       (generate-level)
+;;       (create-tile p/grass [0 0])
+;;       (create-entity p/player [0 0])) :c->e->v)
 (defsub player-pos [db] (let [[player-id _] (first (get-in db [:c->e->v :player]))]
                           (get-in db [:c->e->v :pos player-id])))
-(def view-radius 10)
-(def level-radius 30)
-
 (defn generate-cave-level [{:keys [level current-dir move-dir pos] :as cave}]
   (-> cave
       (assoc :pos [0 0])
@@ -250,8 +266,44 @@
         db                                       (assoc db :cave cave)
         ]
     db))
+(defn get-player-id [{:keys [c->e->v] :as db}] (first (first (get-in c->e->v [:player]))))
+(defn get-player-pos [{:keys [c->e->v] :as db}] (get-in c->e->v [:pos (get-player-id db)]))
+;; (get-player-pos @db)
+(defn world-movement [{:keys [c->e->v current-dir move-dir] :as db}]
+  (let [pos (get-player-pos db)
+        previous-coords pos
+        [destination-coords destination-type] (let [c (vec+ move-dir pos)
+                                                    t (get-in c->e->v [:tile c :type])]
+                                                   (if (and (= :wall t) (diag-dirs move-dir))
+                                                     (let [c1 (vec+ ((diag-dirs move-dir) 0) pos)
+                                                           c2 (vec+ ((diag-dirs move-dir) 1) pos)
+                                                           t1 (get-in c->e->v [:tile c1 :type])
+                                                           t2 (get-in c->e->v [:tile c2 :type])]
+                                                       (if (= t1 t2 :wall)
+                                                         [c t]
+                                                         (rand-nth (filter #(not= :wall (% 1)) [[c1 t1] [c2 t2]]))))
+                                                     [c t]))
+        db (case destination-type
+             :wall  db
+             nil    db
+             :floor  [db (-> cave
+                             (assoc-in [:level previous-coords] :floor)
+                             (assoc-in [:level destination-coords] :player)
+                             (assoc-in [:pos] destination-coords))]
+             :loot  [(-> db
+                          (add-message "You found some loot")
+                          (update :inventory do-transaction {:loot 1}))
+                      (-> cave
+                          (assoc-in [:level previous-coords] :floor)
+                          (assoc-in [:level destination-coords] :player)
+                          (assoc-in [:pos] destination-coords))])
+        cave                                  (assoc cave :move-dir current-dir)
+        db                                    (assoc db :cave cave)
+        ]
+    db))
 
-(defn prob [p] (> p (rand)))
+(defevent mouse-over-tile [db t]
+  (assoc db :popup-text (get-in db [:c->e->v :tile t :name])))
 (defn component-values [c->e->v c es]
   (map (c->e->v c) es))
 (defn entity-components [c->e->v e cs]
@@ -261,27 +313,39 @@
         entity-chars                  (component-values c->e->v :char contents)]
     [color char contents entity-chars]))
 (defsub tile-visual [t] [[[color char contents entity-chars]] [(tile-visual-data t)]]
-  ^{:key t} [:p]
-  )
+  ^{:key t} [:p {:style {:background-color color}
+                 :on-mouse-over #(mouse-over-tile t)}
+             (or char " ")
+             ])
 
 
-;; (defn generate-level [db]
-;;   (assoc db :entity-count 0
-;;          :c->e->v (reduce f {} ))
-;;   (assoc (zipmap (for [x (range (- level-radius) (inc level-radius))
-;;                        y (range (- level-radius) (inc level-radius))]
-;;                    [x y])
-;;                  (map #(rand-nth [:wall :wall :wall :wall :wall :wall :floor :floor :floor :floor :floor :loot])
-;;                       (range)))
-;;          [0 0] :player)
-;;   )
+
+
+(def pos [0 0])
+(def posx 0)
+(def posy 0)
 (def grid-side-length (inc (* 2 view-radius)))
 (defsub world-view [[posx posy]] [tile-visuals (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
                                                      x (range (- posx view-radius) (+ 1 posx view-radius))]
                                                  (tile-visual [x y]))]
-  [:div.grid.aspect-square.text-xl.select-none.m-4
+  [:div.grid.aspect-square.text-3xl.select-none.m-4
    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
-   (seq tile-visuals)])
+   (doall (seq tile-visuals))]
+  )
+
+;; (defn world-view []
+;;   (let [[posx posy] [(sget [:pos 0]) (sget [:pos 1])]]
+;;     (fn []
+;;       [:div.grid.aspect-square.text-3xl.select-none.m-4
+;;        {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
+;;        "a"
+;;        posx
+;;        posy
+;;        (doall (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
+;;                     x (range (- posx view-radius) (+ 1 posx view-radius))]
+;;                 (tile-visual [x y])))
+;;        ])
+;;     ))
 (defsub cave-view [] [[{:keys [level pos player-emoji]}] [(sget [:cave])]]
   [:div.grid.aspect-square.text-3xl.select-none.m-4
    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
@@ -319,13 +383,16 @@
            (update db :cave generate-cave-level)
            db)
          :current-place place))
+(defsub description-popup [db] [[text] [(sget [:popup-text])]]
+  [:p text])
 (defsub sidebar [] [[places message-log-view] [(places) (message-log-view)]]
   [:div.flex.flex-col
    (for [place places]
      ^{:key place} [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out
                     {:on-click #(go-to-place place)}
                     (kw->str place)])
-   message-log-view])
+   message-log-view]
+  )
 (defn view []
   ;; [:title "aaaaaaaaaaaaa"]
   [:div.h-screen.w-screen.flex.flex-row.bg-gray-600.font-mono.text-blue-400.text-lg.overflow-hidden
@@ -335,7 +402,8 @@
    ;; [:p @(s :all)]
    [:div.w-72.flex-none ;; .overflow-hidden
     @(sidebar)]
-   @(@(current-place) )
+   [:div  @(world-view (get-player-pos @db)) ]
+   ;; @(@(current-place) )
    ;; (fn [] @(home) )
    ;; @(crafting-menu)
    ;; [:div @(@(current-place) ) ]
@@ -345,6 +413,10 @@
 ;; (type @(@(current-place) ))
 
 
+(defevent init [_] (-> db/default-db
+                       generate-level) ;; (fn-traced [_ _]
+                          ;; db/default-db)
+  )
 
 (comment
   (render (<> "You have"

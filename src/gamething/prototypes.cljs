@@ -5,7 +5,6 @@
                   :color     "#717171"
                   :char      "#"
                   :name      "wall"
-                  :contentes #{}
                   }})
 (def loot {:char     "💰"
            :name     "loot"
@@ -15,12 +14,10 @@
                   :color     "#626B00"
                   :char      "🌲"
                   :name      "tree"
-                  :contentes #{}
                   }})
 (def grass {:tile {:type      :floor
                    :color     "#22B800"
                    :name      "grass"
-                   :contentes #{}
                    }})
 (def player {:char   "😀"
              :name   "player"
