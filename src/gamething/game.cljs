@@ -297,18 +297,21 @@
         (assoc :popup-text (get-in c->e->v [:name t ])))))
 (def grid-side-length (inc (* 2 view-radius)))
 (defn make-tiles [c->e->v [posx posy]]
-  (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
-        x (range (- posx view-radius) (+ 1 posx view-radius))]
-    (let [t                  [x y]
-          {:keys [bg-color]} (get-in c->e->v [:tile t])
-          es                 (conj (keys (get-in c->e->v [:container t])) t)
-          chars              (component-values c->e->v :char es)]
-      ^{:key t} [:p;; .aspect-square
-                 {:style         {:background-color bg-color}
-                                   :on-mouse-over #(mouse-over-tile t)}
-                 (last chars)
-                 ;; (rand-nth (filter identity (seq chars)))
-                 ])))
+  [:div.grid.text-3xl.select-none;; .m-4  ;; .aspect-square
+   {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
+            :height                "100vh"
+            :width                 "100vh"}}
+   (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
+         x (range (- posx view-radius) (+ 1 posx view-radius))]
+     (let [t                  [x y]
+           {:keys [bg-color]} (get-in c->e->v [:tile t])
+           es                 (conj (keys (get-in c->e->v [:container t])) t)
+           chars              (component-values c->e->v :char es)]
+       ^{:key t} [:p {:style         {:background-color bg-color}
+                      :on-mouse-over #(mouse-over-tile t)}
+                  (last chars)
+                  ;; (rand-nth (filter identity (seq chars)))
+                  ]))])
 ;; (component-values (@db :c->e->v) :char [[0 3]])
 (defevent tick [{:keys [c->e->v] :as db}]
   (let [n (get-in db [:inventory :thing-maker])]
@@ -339,7 +342,7 @@
 (defsub sidebar [] [[places message-log-view] [(places) (message-log-view)]]
   [:div.flex.flex-col
    (for [place places]
-     ^{:key place} [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out
+     ^{:key place} [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-green-900
                     {:on-click #(go-to-place place)}
                     (kw->str place)])
    message-log-view]
@@ -355,15 +358,8 @@
      ;; [:p @(s :all)]
      [:div.w-72.flex-none ;; .overflow-hidden
       @(sidebar)]
-     [:div.grid.text-3xl.select-none.m-4 ;; .aspect-square
-      {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
-      @(sget [:tiles])
-      ;; (doall (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
-      ;;              x (range (- posx view-radius) (+ 1 posx view-radius))]
-      ;;          ;; "a"
-      ;;          @(tile-visual [x y])
-      ;;          ))
-      ]
+     @(sget [:tiles])
+
      ]
     )
   )
