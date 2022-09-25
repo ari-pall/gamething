@@ -8,21 +8,34 @@
            :char "#"
            })
 (def tree {:tile {:type     :wall
-                  :bg-color "#626B00"
+                  :bg-color "#27AD00"
                   }
            :name "tree"
            :char "🌲"
+           })
+(def rock {:tile {:type     :wall
+                  :bg-color "#71A269"
+                  }
+           :name "rock"
+           :char "🪨"
            })
 (def grass {:tile {:type     :floor
                    :bg-color "#22B800"
                    }
             :name "grass"
             })
-(def loot {:char     "💰"
-           :name     "loot"
-           :takeable true
-           })
 (def player {:char   "😀"
              :name   "player"
              :player true
+             :container {}
              })
+(def chest {:container {}})
+(def items {:chest {:container {}
+                    :name "chest"
+                    :char "c"}
+            :loot  {:char     "💰"
+                    :name     "loot"
+                    :takeable true
+                    }
+
+            })
