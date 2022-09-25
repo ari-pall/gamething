@@ -157,23 +157,24 @@
   [:p.text-3xl "garden"])
 (defn hash-set-conj [set new]
   (conj (or set #{}) new))
-(defn create-entity [{:keys [entity-count] :as db} entity entity-pos]
+(defn create-entity [{:keys [entity-count] :as db} prototype entity-pos]
   (-> db
       (update :c->e->v #(reduce (fn [c->e->v [c v]]
                                   (assoc-in c->e->v [c entity-count] v))
                                 %
-                                (assoc entity :pos entity-pos)))
+                                (assoc prototype :pos entity-pos)))
       (update-in [:c->e->v :tile entity-pos :contents] hash-set-conj entity-count)
       (update :entity-count inc)))
-
-;; (stylo.core/c? :objeca 2)
-;; (c :bk)
-(defn create-tile [{:keys [c->e->v] :as db} {:keys [tile]} tile-pos]
+;; @db
+(defn create-tile [{:keys [c->e->v] :as db} {:keys [tile] :as tile-prototype} tile-pos]
   (let [{:keys [type bg-color]} tile]
     (assert (and type bg-color) (str "tile " tile " must have a color and type"))
-    (assoc-in db [:c->e->v :tile tile-pos] (assoc tile :contents #{}))))
-(def view-radius 15)
-(def level-radius 70)
+    (update db :c->e->v #(reduce (fn [c->e->v [c v]]
+                                   (assoc-in c->e->v [c tile-pos] v))
+                                 %
+                                 (assoc-in tile-prototype [:tile :contents] #{})))))
+(def view-radius 12)
+(def level-radius 40)
 (defn prob [p] (> p (rand)))
 (defn generate-level [db]
   (-> (reduce (fn [db pos]
@@ -275,6 +276,7 @@
   (get-in c->e->v [:tile t :contents]))
 (defn get-player-id [{:keys [c->e->v] :as db}] (first (first (get-in c->e->v [:player]))))
 (defn get-player-pos [{:keys [c->e->v] :as db}] (get-in c->e->v [:pos (get-player-id db)]))
+(defsub player-pos-sub [db] (get-player-pos db))
 ;; (get-player-pos @db)
 ;; ( @db :move-dir)
 (defn world-movement [{:keys [c->e->v current-dir move-dir] :as db}]
@@ -304,19 +306,24 @@
                                         (assoc-in [:pos player-id] destination))))
         (assoc :move-dir current-dir))))
 
-(defevent mouse-over-tile [{:keys [c->e->v] :as db} t]
-  (-> db
-      (add-message (str (get-in c->e->v [:tile t :char])
-                        " that's a " (get-in c->e->v [:tile t :name])))
-      (assoc db :popup-text (get-in c->e->v [:tile t :name]))))
+;; (component-values (@db :c->e->v) :name [0])
 (defn component-values [c->e->v c es]
   (map (c->e->v c) es))
 (defn entity-components [c->e->v e cs]
   (map #(% e) (map c->e->v cs) ))
+(defevent mouse-over-tile [{:keys [c->e->v] :as db} t]
+  (let [es    (conj (get-in c->e->v [:tile t :contents]) t)
+        chars (component-values c->e->v :char es)
+        names (component-values c->e->v :name es)
+        ]
+    (-> db
+        (add-message (apply str " that's "(map #(str " " %1 " " %2 " " %3) es chars names)))
+        (assoc :popup-text (get-in c->e->v [:name t ])))))
 (defsub tile-visual-data [{:keys [c->e->v]} t]
   (let [{:keys [bg-color contents]} (get-in c->e->v [:tile t])
         chars                       (component-values c->e->v :char (hash-set-conj contents t))]
     [bg-color chars]))
+;; (@db :c->e->v)
 (defsub tile-visual [t] [[[bg-color chars]] [(tile-visual-data t)]]
   ^{:key t} [:p {:style         {:background-color bg-color}
                  :on-mouse-over #(mouse-over-tile t)}
@@ -330,16 +337,15 @@
 ;;    (doall (seq tile-visuals))]
 ;;   )
 
-(defn world-view []
-  (let [[posx posy] [(sget [:pos 0]) (sget [:pos 1])]]
-    (fn []
-      [:div.grid.aspect-square.text-3xl.select-none.m-4
-       {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
-       (doall (for [y (reverse (range (- @posy view-radius) (+ 1 @posy view-radius)))
-                    x (range (- @posx view-radius) (+ 1 @posx view-radius))]
-                (tile-visual [x y])))
-       ])
-    ))
+;; (tile-visual-data [0 0])
+;; (defn world-view []
+;;   (let [[posx posy] @(player-pos-sub)]
+;;     [:div.grid.aspect-square.text-3xl.select-none.m-4
+;;      {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
+;;      (doall (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
+;;                   x (range (- posx view-radius) (+ 1 posx view-radius))]
+;;               (tile-visual [x y])))
+;;      ]))
 (defsub cave-view [] [[{:keys [level pos player-emoji]}] [(sget [:cave])]]
   [:div.grid.aspect-square.text-3xl.select-none.m-4
    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
@@ -391,25 +397,25 @@
   )
 (def aa 43)
 (defn view []
-  ;; [:title "aaaaaaaaaaaaa"]
-  [:div.h-screen.w-screen.flex.flex-row.bg-gray-600.font-mono.text-red-200.text-lg.overflow-hidden
-   {:onMouseUp     #(mouse-up)
-    :on-mouse-move #(mouse-move %1)
-    }
-   ;; [:p @(s :all)]
-   [:div.w-72.flex-none ;; .overflow-hidden
-    @(sidebar)]
-   [:div ((world-view))]
-   ;; [:div  @(world-view (get-player-pos @db)) ]
-   ;; @(@(current-place) )
-   ;; (fn [] @(home) )
-   ;; @(crafting-menu)
-   ;; [:div @(@(current-place) ) ]
-   ])
-
-;; [:div (@(current-place) ) ]
-;; (type @(@(current-place) ))
-
+  (let [[posx posy] @(player-pos-sub)]
+    [:div.h-screen.w-screen.flex.flex-row.bg-gray-600.font-mono.text-red-200.text-lg.overflow-hidden
+     {:onMouseUp     #(mouse-up)
+      :on-mouse-move #(mouse-move %1)
+      }
+     ;; [:p @(s :all)]
+     [:div.w-72.flex-none ;; .overflow-hidden
+      @(sidebar)]
+     [:div.grid.aspect-square.text-3xl.select-none.m-4
+      {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")}}
+      (doall (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
+                   x (range (- posx view-radius) (+ 1 posx view-radius))]
+               ;; "a"
+               @(tile-visual [x y])
+               ))
+      ]
+     ]
+    )
+  )
 
 (defevent init [_] (-> db/default-db
                        generate-level) ;; (fn-traced [_ _]

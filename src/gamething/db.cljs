@@ -31,7 +31,7 @@
                                               }}
    :entity-count 0
    :c->e->v      {}
-   ;; :pos          [0 0]
+   :pos          [0 0]
    :current-dir  [0 0]
    :move-dir     [0 0]
    :cave          {:level        nil
