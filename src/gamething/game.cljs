@@ -157,6 +157,8 @@
   [:p.text-3xl "garden"])
 (defn hash-set-conj [set new]
   (conj (or set #{}) new))
+(defn create-item [db item-kw item-pos]
+  (update-in db [:c->e->v :container item-pos item-kw] inc))
 (defn create-entity [{:keys [entity-count] :as db} prototype entity-pos]
   (-> db
       (update :c->e->v #(reduce (fn [c->e->v [c v]]
@@ -179,9 +181,12 @@
 
 (defn generate-level [db]
   (-> (reduce (fn [db pos]
-                (cond (prob 0.1) (create-tile db p/tree pos)
+                (cond (prob 0.1)  (create-tile db p/tree pos)
                       (prob 0.03) (create-tile db p/rock pos)
-                      true (create-tile db p/grass pos)))
+                      (prob 0.01 ) (-> db
+                                      (create-tile p/grass pos)
+                                      (create-item :loot pos))
+                      true        (create-tile db p/grass pos)))
               db
               (for [x (range (- level-radius) (inc level-radius))
                     y (range (- level-radius) (inc level-radius))]
@@ -249,6 +254,11 @@
                ) [:container container e] inc))
 ;; (defn pick-up-item [{:keys [c->e->v] :as db} item]
 ;;   )
+(defn container-transfer [c->e->v c1 c2 thing]
+  (update-in c->e->v [:container c1 thing] dec)
+  (update-in c->e->v [:container c2 thing] inc)
+  ;; (let [had-number (get-in c->e->v [:container c1 thing])])
+  )
 (defn world-movement [{:keys [c->e->v current-dir move-dir] :as db}]
   (let [player-id       (get-player-id db)
         pos             (get-player-pos db)
@@ -293,11 +303,13 @@
           {:keys [bg-color]} (get-in c->e->v [:tile t])
           es                 (conj (keys (get-in c->e->v [:container t])) t)
           chars              (component-values c->e->v :char es)]
-      ^{:key t} [:p {:style         {:background-color bg-color}
-                     :on-mouse-over #(mouse-over-tile t)}
-                 (rand-nth chars)
+      ^{:key t} [:p;; .aspect-square
+                 {:style         {:background-color bg-color}
+                                   :on-mouse-over #(mouse-over-tile t)}
+                 (last chars)
                  ;; (rand-nth (filter identity (seq chars)))
                  ])))
+;; (component-values (@db :c->e->v) :char [[0 3]])
 (defevent tick [{:keys [c->e->v] :as db}]
   (let [n (get-in db [:inventory :thing-maker])]
     (cond-> db
