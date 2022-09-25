@@ -27,7 +27,7 @@
                               (js/setTimeout #(rf/dispatch [:add-message! "it tells you what's happening"]) 10000)))
   (defonce tick (js/setInterval ;; #(swap! db gamething.game/tick)
                   #(rf/dispatch-sync [:tick])
-                  50))
+                  100))
   (.addEventListener js/window "keyup" #(rf/dispatch-sync [:key-up (.-key %)]))
   (.addEventListener js/window "keydown" #(rf/dispatch-sync [:key-down (.-key %)]))
   )

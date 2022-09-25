@@ -296,18 +296,23 @@
         (add-message (apply str " that's "(map #(str " " %1 " " %2 " " %3) es chars names)))
         (assoc :popup-text (get-in c->e->v [:name t ])))))
 (def grid-side-length (inc (* 2 view-radius)))
+;; (def height (str js/window.innerHeight "px"))
+(def height "970px")
 (defn make-tiles [c->e->v [posx posy]]
   [:div.grid.text-3xl.select-none;; .m-4  ;; .aspect-square
    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
-            :height                "100vh"
-            :width                 "100vh"}}
+            :height                height
+            :width                 height
+            ;; :position "absolute"
+            }}
    (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
          x (range (- posx view-radius) (+ 1 posx view-radius))]
      (let [t                  [x y]
            {:keys [bg-color]} (get-in c->e->v [:tile t])
            es                 (conj (keys (get-in c->e->v [:container t])) t)
            chars              (component-values c->e->v :char es)]
-       ^{:key t} [:p {:style         {:background-color bg-color}
+       ^{:key t} [:p.aspect-square
+                  {:style         {:background-color bg-color}
                       :on-mouse-over #(mouse-over-tile t)}
                   (last chars)
                   ;; (rand-nth (filter identity (seq chars)))
@@ -347,6 +352,7 @@
                     (kw->str place)])
    message-log-view]
   )
+
 
 (defn view []
   (let [;; [posx posy] @(player-pos-sub)
