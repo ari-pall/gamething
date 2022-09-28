@@ -29,6 +29,14 @@
              :player true
              :container {}
              })
+(def sheep {:char            "🐑"
+            :name            "sheep"
+            :random-movement true
+            })
+(def duck {:char            "🦆"
+           :name            "duck"
+           :random-movement true
+           })
 (def chest {:container {}})
 (def items {:chest {:container {}
                     :name "chest"

@@ -1,6 +1,6 @@
 (ns gamething.styles
   (:require-macros
-   [garden.def :refer [defcssfn]]
+   ;; [garden.def :refer [defcssfn]]
    )
   (:require
    ;; [spade.core   :refer [defglobal defclass]]

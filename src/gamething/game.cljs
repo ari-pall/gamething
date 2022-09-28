@@ -177,13 +177,20 @@
 (def level-radius 60)
 (defn prob [p] (> p (rand)))
 
+;; (get-in @db [:c->e->v :random-movement])
 (defn generate-level [db]
   (-> (reduce (fn [db pos]
                 (cond (prob 0.1)  (create-tile db p/tree pos)
                       (prob 0.03) (create-tile db p/rock pos)
-                      (prob 0.01 ) (-> db
-                                      (create-tile p/grass pos)
-                                      (create-item :loot pos))
+                      (prob 0.001 ) (-> db
+                                       (create-tile p/grass pos)
+                                       (create-entity p/sheep pos))
+                      (prob 0.001 ) (-> db
+                                        (create-tile p/grass pos)
+                                        (create-entity p/duck pos))
+                      (prob 0.01) (-> db
+                                       (create-tile p/grass pos)
+                                       (create-item :loot pos))
                       true        (create-tile db p/grass pos)))
               db
               (for [x (range (- level-radius) (inc level-radius))
@@ -195,7 +202,7 @@
                                 (for [kw    (keys p/items)
                                       [c v] (p/items kw)]
                                   [c kw v])))
-      (assoc :entity-count 0)
+      ;; (assoc :entity-count 0)
       (create-tile p/grass [0 0])
       (create-entity p/player [0 0])))
 ;; (defsub player-pos [db] (let [[player-id _] (first (get-in db [:c->e->v :player]))]
@@ -240,23 +247,22 @@
 ;; (defsub player-pos-sub [db] (get-player-pos db))
 ;; (get-player-pos @db)
 ;; ( @db :move-dir)
-(defn container-add [c->e->v container e]
-  (update-in (if (keyword? e)
-               c->e->v
-               (assoc-in c->e->v [:pos e] container)
-               ) [:container container e] inc))
-(defn container-remove [c->e->v container e]
-  (update-in (if (keyword? e)
-               c->e->v
-               (assoc-in c->e->v [:pos e] container)
-               ) [:container container e] inc))
-;; (defn pick-up-item [{:keys [c->e->v] :as db} item]
-;;   )
-;; (defn container-transfer [c->e->v c1 c2 transaction]
-;;   (update-in c->e->v [:container c1 thing] dec)
-;;   (update-in c->e->v [:container c2 thing] inc)
-;;   ;; (let [had-number (get-in c->e->v [:container c1 thing])])
-;;   )
+(defn container-transfer [c->e->v c1 c2 transaction]
+  (assert (not-any? neg? (vals transaction)))
+  (reduce (fn [c->e->v [item-id num]]
+            (let [num-in-c1 (get-in c->e->v [:container c1 item-id])
+                  c->e->v   (if (keyword? item-id)
+                              c->e->v
+                              (assoc-in c->e->v [:pos item-id] c2))]
+              (if (>= num num-in-c1)
+                (-> c->e->v
+                    (update-in [:container c1] dissoc item-id)
+                    (update-in [:container c2 item-id] + num))
+                (-> c->e->v
+                    (update-in [:container c1 item-id] - num)
+                    (update-in [:container c2 item-id] + num)))))
+          c->e->v
+          transaction))
 (defn component-values [c->e->v c es]
   (map (c->e->v c) es))
 (defn entity-components [c->e->v e cs]
@@ -264,14 +270,21 @@
 (defn pick-up-items-on-tile [c->e->v t player-id]
   (let [tile-contents (keys (get-in c->e->v [:container t]))
         takeable-items (map first (filter second (map vector tile-contents (component-values c->e->v :takeable tile-contents))))]
-    (reduce (fn [c->e->v item-id]
-              (-> (if (keyword? item-id)
-                    c->e->v
-                    (assoc-in c->e->v [:pos item-id] player-id))
-                  (update-in [:container player-id item-id] + (get-in c->e->v [:container t item-id]))
-                  (update-in [:container t] dissoc item-id)))
-              c->e->v
-              takeable-items)))
+    (container-transfer c->e->v t player-id (zipmap takeable-items (map #(get-in c->e->v [:container t %]) takeable-items)))
+    ))
+;; (let [ks (keys (@db :c->e->v))]
+;;   (map vector ks (entity-components (@db :c->e->v) 0 ks)))
+
+(defn random-movement [c->e->v]
+  (let [affected (keys (c->e->v :random-movement))
+        pos-es (component-values c->e->v :pos affected)]
+    (reduce (fn [c->e->v [e pos]]
+              (let [destination (vec+ pos (rand-nth [[1 0] [-1 0] [0 1] [0 -1]]))]
+                (if (= :floor (get-in c->e->v [:tile destination :type]))
+                  (container-transfer c->e->v pos destination {e 1})
+                  c->e->v)))
+            c->e->v
+            (map vector affected pos-es))))
 (defn world-movement [{:keys [c->e->v current-dir move-dir] :as db}]
   (let [player-id       (get-player-id db)
         pos             (get-player-pos db)
@@ -293,10 +306,8 @@
           :wall  db
           nil    db
           :floor (assoc db :c->e->v (-> c->e->v
-                                        (pick-up-items-on-tile destination player-id)
-                                        (update-in [:container pos] dissoc player-id)
-                                        (update-in [:container destination player-id] inc)
-                                        (assoc-in [:pos player-id] destination))))
+                                        (container-transfer pos destination {player-id 1})
+                                        (pick-up-items-on-tile destination player-id))))
         (assoc :move-dir current-dir))))
 (defevent mouse-over-tile [{:keys [c->e->v] :as db} t]
   (let [es    (conj (keys (get-in c->e->v [:container t])) t)
@@ -335,6 +346,7 @@
   (let [n (get-in db [:inventory :thing-maker])]
     (cond-> db
       (pos? n) (update :inventory do-transaction {:thing n})
+      (prob 0.3) (update :c->e->v random-movement)
       true     (world-movement)
       true (assoc :tiles (make-tiles c->e->v (get-player-pos db)))
       )))
