@@ -56,7 +56,6 @@
                        :stick          {}
                        :thing-maker {:conveyor-belt 1 :metal-gear 1 :electric-motor 1}
                        })
-;; try-to-craft has to operate on db because it modifies the inventory and also the message-log
 (defevent try-to-craft [db id]
   (if-let [recipe (crafting-recipes id)]
     (let [t (update (zipmap (keys recipe)
@@ -173,8 +172,7 @@
     (update db :c->e->v #(reduce (fn [c->e->v [c v]]
                                    (assoc-in c->e->v [c tile-pos] v))
                                  %
-                                 (assoc tile-prototype :container {})
-                                 ))))
+                                 (assoc tile-prototype :container {})))))
 (def view-radius 12)
 (def level-radius 60)
 (defn prob [p] (> p (rand)))
@@ -200,8 +198,8 @@
       (assoc :entity-count 0)
       (create-tile p/grass [0 0])
       (create-entity p/player [0 0])))
-(defsub player-pos [db] (let [[player-id _] (first (get-in db [:c->e->v :player]))]
-                          (get-in db [:c->e->v :pos player-id])))
+;; (defsub player-pos [db] (let [[player-id _] (first (get-in db [:c->e->v :player]))]
+;;                           (get-in db [:c->e->v :pos player-id])))
 (defevent key-up [db key]
   (if-let [i (case key
                "a"          0
@@ -239,7 +237,7 @@
   (keys (get-in c->e->v [:container t])))
 (defn get-player-id [{:keys [c->e->v] :as db}] (first (first (get-in c->e->v [:player]))))
 (defn get-player-pos [{:keys [c->e->v] :as db}] (get-in c->e->v [:pos (get-player-id db)]))
-(defsub player-pos-sub [db] (get-player-pos db))
+;; (defsub player-pos-sub [db] (get-player-pos db))
 ;; (get-player-pos @db)
 ;; ( @db :move-dir)
 (defn container-add [c->e->v container e]
@@ -254,11 +252,26 @@
                ) [:container container e] inc))
 ;; (defn pick-up-item [{:keys [c->e->v] :as db} item]
 ;;   )
-(defn container-transfer [c->e->v c1 c2 thing]
-  (update-in c->e->v [:container c1 thing] dec)
-  (update-in c->e->v [:container c2 thing] inc)
-  ;; (let [had-number (get-in c->e->v [:container c1 thing])])
-  )
+;; (defn container-transfer [c->e->v c1 c2 transaction]
+;;   (update-in c->e->v [:container c1 thing] dec)
+;;   (update-in c->e->v [:container c2 thing] inc)
+;;   ;; (let [had-number (get-in c->e->v [:container c1 thing])])
+;;   )
+(defn component-values [c->e->v c es]
+  (map (c->e->v c) es))
+(defn entity-components [c->e->v e cs]
+  (map #(% e) (map c->e->v cs)))
+(defn pick-up-items-on-tile [c->e->v t player-id]
+  (let [tile-contents (keys (get-in c->e->v [:container t]))
+        takeable-items (map first (filter second (map vector tile-contents (component-values c->e->v :takeable tile-contents))))]
+    (reduce (fn [c->e->v item-id]
+              (-> (if (keyword? item-id)
+                    c->e->v
+                    (assoc-in c->e->v [:pos item-id] player-id))
+                  (update-in [:container player-id item-id] + (get-in c->e->v [:container t item-id]))
+                  (update-in [:container t] dissoc item-id)))
+              c->e->v
+              takeable-items)))
 (defn world-movement [{:keys [c->e->v current-dir move-dir] :as db}]
   (let [player-id       (get-player-id db)
         pos             (get-player-pos db)
@@ -280,14 +293,11 @@
           :wall  db
           nil    db
           :floor (assoc db :c->e->v (-> c->e->v
+                                        (pick-up-items-on-tile destination player-id)
                                         (update-in [:container pos] dissoc player-id)
                                         (update-in [:container destination player-id] inc)
                                         (assoc-in [:pos player-id] destination))))
         (assoc :move-dir current-dir))))
-(defn component-values [c->e->v c es]
-  (map (c->e->v c) es))
-(defn entity-components [c->e->v e cs]
-  (map #(% e) (map c->e->v cs) ))
 (defevent mouse-over-tile [{:keys [c->e->v] :as db} t]
   (let [es    (conj (keys (get-in c->e->v [:container t])) t)
         chars (component-values c->e->v :char es)
@@ -298,6 +308,9 @@
 (def grid-side-length (inc (* 2 view-radius)))
 ;; (def height (str js/window.innerHeight "px"))
 (def height "970px")
+{:provider (fn [] "some string data or a tuple")
+ :hl (fn [] {:fg "…" :bg "…"})
+ :left_sep (fn [] {:icon "" :hl { :fg "…" :bg "…"}})}
 (defn make-tiles [c->e->v [posx posy]]
   [:div.grid.text-3xl.select-none;; .m-4  ;; .aspect-square
    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
