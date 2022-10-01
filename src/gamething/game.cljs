@@ -177,7 +177,6 @@
 (def level-radius 60)
 (defn prob [p] (> p (rand)))
 
-;; (get-in @db [:c->e->v :random-movement])
 (defn generate-level [db]
   (-> (reduce (fn [db pos]
                 (cond (prob 0.1)  (create-tile db p/tree pos)
@@ -188,6 +187,9 @@
                       (prob 0.001 ) (-> db
                                         (create-tile p/grass pos)
                                         (create-entity p/duck pos))
+                      (prob 0.001 ) (-> db
+                                        (create-tile p/grass pos)
+                                        (create-entity p/rabbit pos))
                       (prob 0.01) (-> db
                                        (create-tile p/grass pos)
                                        (create-item :loot pos))
@@ -270,8 +272,7 @@
 (defn pick-up-items-on-tile [c->e->v t player-id]
   (let [tile-contents (keys (get-in c->e->v [:container t]))
         takeable-items (map first (filter second (map vector tile-contents (component-values c->e->v :takeable tile-contents))))]
-    (container-transfer c->e->v t player-id (zipmap takeable-items (map #(get-in c->e->v [:container t %]) takeable-items)))
-    ))
+    (container-transfer c->e->v t player-id (zipmap takeable-items (map #(get-in c->e->v [:container t %]) takeable-items)))))
 ;; (let [ks (keys (@db :c->e->v))]
 ;;   (map vector ks (entity-components (@db :c->e->v) 0 ks)))
 
@@ -280,7 +281,7 @@
         pos-es (component-values c->e->v :pos affected)]
     (reduce (fn [c->e->v [e pos]]
               (let [destination (vec+ pos (rand-nth [[1 0] [-1 0] [0 1] [0 -1]]))]
-                (if (= :floor (get-in c->e->v [:tile destination :type]))
+                (if (and (prob 0.3) (= :floor (get-in c->e->v [:tile destination :type])))
                   (container-transfer c->e->v pos destination {e 1})
                   c->e->v)))
             c->e->v
@@ -317,11 +318,11 @@
         (add-message (apply str " that's "(map #(str " " %1 " " %2 " " %3) es chars names)))
         (assoc :popup-text (get-in c->e->v [:name t ])))))
 (def grid-side-length (inc (* 2 view-radius)))
-;; (def height (str js/window.innerHeight "px"))
-(def height "970px")
-{:provider (fn [] "some string data or a tuple")
- :hl (fn [] {:fg "…" :bg "…"})
- :left_sep (fn [] {:icon "" :hl { :fg "…" :bg "…"}})}
+(def height (str js/window.innerHeight "px"))
+;; (def height "970px")
+;; {:provider (fn [] "some string data or a tuple")
+;;  :hl (fn [] {:fg "…" :bg "…"})
+;;  :left_sep (fn [] {:icon "" :hl { :fg "…" :bg "…"}})}
 (defn make-tiles [c->e->v [posx posy]]
   [:div.grid.text-3xl.select-none;; .m-4  ;; .aspect-square
    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
@@ -337,19 +338,23 @@
            chars              (component-values c->e->v :char es)]
        ^{:key t} [:p.aspect-square
                   {:style         {:background-color bg-color}
-                      :on-mouse-over #(mouse-over-tile t)}
+                   :on-mouse-over #(mouse-over-tile t)}
                   (last chars)
                   ;; (rand-nth (filter identity (seq chars)))
                   ]))])
 ;; (component-values (@db :c->e->v) :char [[0 3]])
-(defevent tick [{:keys [c->e->v] :as db}]
-  (let [n (get-in db [:inventory :thing-maker])]
-    (cond-> db
-      (pos? n) (update :inventory do-transaction {:thing n})
-      (prob 0.3) (update :c->e->v random-movement)
-      true     (world-movement)
-      true (assoc :tiles (make-tiles c->e->v (get-player-pos db)))
-      )))
+(defevent toggle-reverse-time [db] (update db :reverse-time? not))
+(defevent tick [{:keys [c->e->v reverse-time? time history] :as db}]
+  (if (and reverse-time? (not-empty history))
+    (-> db
+        (assoc :c->e->v (first history))
+        (update :history rest)
+        (assoc :tiles (make-tiles c->e->v (get-player-pos db))))
+    (-> db
+        (update :history conj c->e->v)
+        (update :c->e->v random-movement)
+        (world-movement)
+        (assoc :tiles (make-tiles c->e->v (get-player-pos db))))))
 (defsub current-place [] [[place] [(sget [:current-place])]]
   (case place
     :factory   factory
@@ -390,6 +395,11 @@
      [:div.w-72.flex-none ;; .overflow-hidden
       @(sidebar)]
      @(sget [:tiles])
+     [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-red-800.h-20.w-20.text-3xl
+      {:on-click #(toggle-reverse-time)}
+      (if @(sget [:reverse-time?])
+        "←⌛"
+        "⌛→")]
 
      ]
     )

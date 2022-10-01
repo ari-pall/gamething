@@ -37,11 +37,12 @@
            :name            "duck"
            :random-movement true
            })
+(def rabbit {:char            "🐇"
+             :name            "rabbit"
+             :random-movement true
+             })
 (def chest {:container {}})
-(def items {:chest {:container {}
-                    :name "chest"
-                    :char "c"}
-            :loot  {:char     "💰"
+(def items {:loot  {:char     "💰"
                     :name     "loot"
                     :takeable true
                     }

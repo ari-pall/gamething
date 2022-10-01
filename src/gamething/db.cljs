@@ -31,6 +31,9 @@
                                               }}
    :entity-count 0
    :c->e->v      {}
+   :history '()
+   :time          0
+   :reverse-time? nil
    :current-dir  [0 0]
    :move-dir     [0 0]
    :cave          {:level        nil
@@ -42,5 +45,4 @@
    :message-log   []
    :places        [:home :cave :garden :cards :crafting :inventory :store]
    :current-place :home
-   :time          0
    })
