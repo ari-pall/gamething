@@ -181,7 +181,7 @@
   (-> (reduce (fn [db pos]
                 (cond (prob 0.1)  (create-tile db p/tree pos)
                       (prob 0.03) (create-tile db p/rock pos)
-                      (prob 0.001 ) (-> db
+                      (prob 0.01 ) (-> db
                                        (create-tile p/grass pos)
                                        (create-entity p/sheep pos))
                       (prob 0.001 ) (-> db
@@ -238,10 +238,6 @@
         (assoc-in [:move-dir i] val)
         (assoc-in [:current-dir i] val))
     db))
-(def diag-dirs {[1 1]   [[0 1] [1 0]]
-                [1 -1]  [[0 -1] [1 0]]
-                [-1 -1] [[0 -1] [-1 0]]
-                [-1 1]  [[0 1] [-1 0]]})
 (defn entities-on-tile [{:keys [c->e->v] :as db} t]
   (keys (get-in c->e->v [:container t])))
 (defn get-player-id [{:keys [c->e->v] :as db}] (first (first (get-in c->e->v [:player]))))
@@ -286,29 +282,34 @@
                   c->e->v)))
             c->e->v
             (map vector affected pos-es))))
+
+(def diag-dirs {[1 1]   [[0 1] [1 0]]
+                [1 -1]  [[0 -1] [1 0]]
+                [-1 -1] [[0 -1] [-1 0]]
+                [-1 1]  [[0 1] [-1 0]]})
 (defn world-movement [{:keys [c->e->v current-dir move-dir] :as db}]
   (let [player-id       (get-player-id db)
         pos             (get-player-pos db)
-        previous-coords pos
-        [destination destination-type]
-        (let [c (vec+ move-dir pos)
-              t (get-in c->e->v [:tile c :type])]
-          (if (and (= :wall t) (diag-dirs move-dir))
-            (let [c1 (vec+ ((diag-dirs move-dir) 0) pos)
-                  c2 (vec+ ((diag-dirs move-dir) 1) pos)
-                  t1 (get-in c->e->v [:tile c1 :type])
-                  t2 (get-in c->e->v [:tile c2 :type])]
-              (if (= t1 t2 :wall)
-                [c t]
-                (rand-nth (filter #(not= :wall (% 1)) [[c1 t1] [c2 t2]]))))
-            [c t]))
+        dest (if (diag-dirs move-dir)
+               (let [l  (vec+ ((diag-dirs move-dir) 0) pos)
+                     m  (vec+ move-dir pos)
+                     r  (vec+ ((diag-dirs move-dir) 1) pos)
+                     ;; [lt mt rt] (map #(get-in c->e->v [:tile % :type]) [l m r])
+                     lt (get-in c->e->v [:tile l :type])
+                     mt (get-in c->e->v [:tile m :type])
+                     rt (get-in c->e->v [:tile r :type])]
+                 (cond (= :wall lt rt) pos
+                       (= :wall mt)    (first (rand-nth (filter #(not= :wall (% 1)) [[l lt] [r rt]])))
+                       true            m))
+               (let [dest (vec+ move-dir pos)]
+                 (if (= :wall (get-in c->e->v [:tile dest :type]))
+                   pos
+                   dest)))
         ]
-    (-> (case destination-type
-          :wall  db
-          nil    db
-          :floor (assoc db :c->e->v (-> c->e->v
-                                        (container-transfer pos destination {player-id 1})
-                                        (pick-up-items-on-tile destination player-id))))
+    (-> db
+        (assoc :c->e->v (-> c->e->v
+                            (container-transfer pos dest {player-id 1})
+                            (pick-up-items-on-tile dest player-id)))
         (assoc :move-dir current-dir))))
 (defevent mouse-over-tile [{:keys [c->e->v] :as db} t]
   (let [es    (conj (keys (get-in c->e->v [:container t])) t)
@@ -319,10 +320,6 @@
         (assoc :popup-text (get-in c->e->v [:name t ])))))
 (def grid-side-length (inc (* 2 view-radius)))
 (def height (str js/window.innerHeight "px"))
-;; (def height "970px")
-;; {:provider (fn [] "some string data or a tuple")
-;;  :hl (fn [] {:fg "…" :bg "…"})
-;;  :left_sep (fn [] {:icon "" :hl { :fg "…" :bg "…"}})}
 (defn make-tiles [c->e->v [posx posy]]
   [:div.grid.text-3xl.select-none;; .m-4  ;; .aspect-square
    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
@@ -345,16 +342,18 @@
 ;; (component-values (@db :c->e->v) :char [[0 3]])
 (defevent toggle-reverse-time [db] (update db :reverse-time? not))
 (defevent tick [{:keys [c->e->v reverse-time? time history] :as db}]
-  (if (and reverse-time? (not-empty history))
-    (-> db
-        (assoc :c->e->v (first history))
-        (update :history rest)
-        (assoc :tiles (make-tiles c->e->v (get-player-pos db))))
-    (-> db
-        (update :history conj c->e->v)
-        (update :c->e->v random-movement)
-        (world-movement)
-        (assoc :tiles (make-tiles c->e->v (get-player-pos db))))))
+  (if reverse-time?
+      (if (empty? history)
+        (assoc db :reverse-time? nil)
+        (-> db
+            (assoc :c->e->v (first history))
+            (update :history rest)
+            (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
+      (-> db
+          (update :history conj c->e->v)
+          (update :c->e->v random-movement)
+          (world-movement)
+          (assoc :tiles (make-tiles c->e->v (get-player-pos db))))))
 (defsub current-place [] [[place] [(sget [:current-place])]]
   (case place
     :factory   factory
@@ -367,48 +366,45 @@
     ;; :cave      cave-view
     ))
 (defevent go-to-place [db place]
-  (assoc db ;; (if (= place :cave)
-         ;;   (update db :cave generate-cave-level)
-         ;;   db)
-         :current-place place))
+  (assoc db :current-place place))
 (defsub description-popup [] [[text] [(sget [:popup-text])]]
   [:p text])
 ;; (def sidebar-style (c :flex))
-(defsub sidebar [] [[places message-log-view] [(places) (message-log-view)]]
+(defevent spawn-strange-creature [db] (create-entity db {:random-movement true
+                                                         :name            "strange creature"
+                                                         :char            (rand-nth ["🦵" "🤖" "🦋" "👁" "👿" "🐦" "🦈"])}
+                                                     (get-player-pos db)))
+(defsub sidebar [] [[places message-log-view reverse-time?] [(places) (message-log-view) (sget [:reverse-time?])]]
   [:div.flex.flex-col
-   (for [place places]
-     ^{:key place} [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-green-900
-                    {:on-click #(go-to-place place)}
-                    (kw->str place)])
-   message-log-view]
+    [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-red-800.h-20.w-20.text-3xl
+      {:on-click #(toggle-reverse-time)}
+      (if reverse-time?
+        "←⌛"
+        "⌛→")]
+    [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-green-900
+     {:on-click #(spawn-strange-creature)}
+     "spawn creature"]
+    ;; (for [place places]
+    ;;   ^{:key place} [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-green-900
+    ;;                  {:on-click #(go-to-place place)}
+    ;;                  (kw->str place)])
+    message-log-view]
   )
 
 
 (defn view []
-  (let [;; [posx posy] @(player-pos-sub)
-        ]
-    [:div.h-screen.w-screen.flex.flex-row.bg-gray-600.font-mono.text-red-200.text-lg.overflow-hidden
+  [:div.h-screen.w-screen.flex.flex-row.bg-gray-600.font-mono.text-red-200.text-lg.overflow-hidden
      {:onMouseUp     #(mouse-up)
       :on-mouse-move #(mouse-move %1)
       }
-     ;; [:p @(s :all)]
-     [:div.w-72.flex-none ;; .overflow-hidden
+     [:div.w-72.flex-none
       @(sidebar)]
      @(sget [:tiles])
-     [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-red-800.h-20.w-20.text-3xl
-      {:on-click #(toggle-reverse-time)}
-      (if @(sget [:reverse-time?])
-        "←⌛"
-        "⌛→")]
 
-     ]
-    )
-  )
+     ])
 
 (defevent init [_] (-> db/default-db
-                       generate-level) ;; (fn-traced [_ _]
-                          ;; db/default-db)
-  )
+                       generate-level))
 
 (comment
   (render (<> "You have"

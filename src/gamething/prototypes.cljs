@@ -24,6 +24,11 @@
                    }
             :name "grass"
             })
+(def ladder {:tile {:type :floor
+                    :bg-color "#4A4A4A"}
+             :name "ladder"
+             :char "🪜"
+             :portal :cave})
 (def player {:char   "😀"
              :name   "player"
              :player true
