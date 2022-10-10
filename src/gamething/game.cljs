@@ -11,15 +11,41 @@
    [gamething.prototypes :as p]
    [day8.re-frame.tracing :refer-macros [fn-traced]]
    ;; [schema.core :as s :include-macros true]
-   ;; [uix.core :refer [defui $]]
-   ;; [uix.dom]
+   [uix.core :refer [defui $]]
+   [uix.dom]
    [stylo.core :refer [c]]
+   [dumdom.core :refer [defcomponent]]
+   [dumdom.dom]
    ;; [minicosm.core :refer [start!]]
    ;; [minicosm.ddn :refer [render-to-canvas]]
    ;; [rum.core :as rum :refer [defc reactive react]]
    )
   (:require-macros [gamething.macros :refer [defsub defevent]]))
 
+
+5
+
+(defcomponent heading
+  :on-render (fn [dom-node val old-val])
+  [data]
+  [:h2 {:style {:background "#000"}} (:text data)])
+
+(defcomponent thing [{:keys [n]}]
+  [:div.select-none
+    [:p (str n)]])
+
+(dumdom.core/render
+ [thing {:n 5}]
+ (js/document.getElementById "app"))
+
+;; dumdom.core/render
+;; dumdom.core/defcomponent
+;; uix.core/create-context
+;; uix.core/use-context
+;; uix.core/use-ref
+;; defui
+;; (js/document.getElementById "canvas")
+;; uix.dom/
 (comment
   (render-to-canvas 4 4 (.getElementById js/document "app"))
   )
@@ -312,14 +338,10 @@
                             (pick-up-items-on-tile dest player-id)))
         (assoc :move-dir current-dir))))
 (defevent mouse-over-tile [{:keys [c->e->v] :as db} t]
-  (let [es    (conj (keys (get-in c->e->v [:container t])) t)
-        chars (component-values c->e->v :char es)
-        names (component-values c->e->v :name es)]
-    (-> db
-        (add-message (apply str " that's "(map #(str " " %1 " " %2 " " %3) es chars names)))
-        (assoc :popup-text (get-in c->e->v [:name t ])))))
+  (assoc db :mouse-on-tile t))
 (def grid-side-length (inc (* 2 view-radius)))
 (def height (str js/window.innerHeight "px"))
+(def black-tile [:p.aspect-square {:style {:background-color "#000000"}} " "])
 (defn make-tiles [c->e->v [posx posy]]
   [:div.grid.text-3xl.select-none;; .m-4  ;; .aspect-square
    {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
@@ -329,6 +351,10 @@
             }}
    (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
          x (range (- posx view-radius) (+ 1 posx view-radius))]
+     ;; (if visible?
+     ;;   ...
+     ;;   black-tile
+     ;;   )
      (let [t                  [x y]
            {:keys [bg-color]} (get-in c->e->v [:tile t])
            es                 (conj (keys (get-in c->e->v [:container t])) t)
@@ -367,15 +393,20 @@
     ))
 (defevent go-to-place [db place]
   (assoc db :current-place place))
-(defsub description-popup [] [[text] [(sget [:popup-text])]]
-  [:p text])
 ;; (def sidebar-style (c :flex))
 (defevent spawn-strange-creature [db] (create-entity db {:random-movement true
                                                          :name            "strange creature"
                                                          :char            (rand-nth ["🦵" "🤖" "🦋" "👁" "👿" "🐦" "🦈"])}
                                                      (get-player-pos db)))
+
+"🧰
+👜
+🪄
+📓
+🔍"
 (defsub sidebar [] [[places message-log-view reverse-time?] [(places) (message-log-view) (sget [:reverse-time?])]]
   [:div.flex.flex-col
+   ;; [:grid.]
     [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-red-800.h-20.w-20.text-3xl
       {:on-click #(toggle-reverse-time)}
       (if reverse-time?
@@ -390,23 +421,39 @@
     ;;                  (kw->str place)])
     message-log-view]
   )
-
+(defsub desc-popup [] [[c->e->v t] [(sget [:c->e->v]) (sget [:mouse-on-tile])]]
+  [:div.flex.flex-col.bg-gray-600.font-mono.text-red-200.text-lg
+   (for [e (conj (keys (get-in c->e->v [:container t])) t)]
+     (let [[char name] (entity-components c->e->v e [:char :name])]
+       [:p (str char " " name)]))])
 
 (defn view []
   [:div.h-screen.w-screen.flex.flex-row.bg-gray-600.font-mono.text-red-200.text-lg.overflow-hidden
-     {:onMouseUp     #(mouse-up)
-      :on-mouse-move #(mouse-move %1)
-      }
-     [:div.w-72.flex-none
-      @(sidebar)]
-     @(sget [:tiles])
+   {:onMouseUp     #(mouse-up)
+    :on-mouse-move #(mouse-move %1)
+    }
+   [:div.w-72.flex-none
+    @(sidebar)]
+   [:canvas#canvas.aspect-square]
+   ;; @(sget [:tiles])
+   @(desc-popup)
 
-     ])
+
+   ])
 
 (defevent init [_] (-> db/default-db
                        generate-level))
 
 (comment
+(.fillText context "hello world 🤡" 50 90 140)
+dorun
+dorun
+for
+
+set!
+aget
+  (def canvas (js/document.getElementById "canvas"))
+  (def context (.getContext (js/document.getElementById "canvas") "2d"))
   (render (<> "You have"
               (for [item all-items]
                 [(str (inventory item) " " item) (actions inventory item)])

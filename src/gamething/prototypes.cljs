@@ -34,6 +34,11 @@
              :player true
              :container {}
              })
+
+(def spider {:char          "🕷"
+             :name          "spider"
+             :attack-player true
+             })
 (def sheep {:char            "🐑"
             :name            "sheep"
             :random-movement true

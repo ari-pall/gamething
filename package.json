@@ -15,7 +15,8 @@
 		"postcss": "^8.4.16",
 		"react": "^18.2.0",
 		"react-dom": "^18.2.0",
-		"shortid": "2.2.16"
+		"shortid": "2.2.16",
+		"snabbdom": "^3.5.1"
 	},
 	"devDependencies": {
 		"shadow-cljs": "^2.20.1",

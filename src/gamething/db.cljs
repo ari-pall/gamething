@@ -18,7 +18,6 @@
    :drag          {:held-card              nil
                    :held-card-relative-pos [nil nil]
                    }
-   :popup-text nil
    :factory       {:view-offest              [0 0]
                    :held-object              nil
                    :held-object-relative-pos [nil nil]
@@ -29,6 +28,7 @@
                                               2 {:id       :conveyor-belt
                                                  :connects [1 0]}
                                               }}
+   :mouse-on-tile nil
    :entity-count 0
    :c->e->v      {}
    :history '()
