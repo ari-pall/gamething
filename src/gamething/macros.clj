@@ -31,25 +31,12 @@
 
 (defmacro defevent
   ([name f]
-   `(do
-      (defn ~name [] (re-frame.core/dispatch [~(keyword name)]))
-      (re-frame.core/reg-event-db ~(keyword name)
-                                  (fn [~'db ~'_]
-                                    (~f ~'db)))))
+   `(defn ~name []
+      (swap! ~'gamething.game/db ~f)
+      (js/console.log ~(str name "ed"))
+      ))
   ([name [db & args] body]
-   `(do
-      (defn ~name [~@args] (re-frame.core/dispatch [~(keyword name) ~@args]))
-      (re-frame.core/reg-event-db ~(keyword name)
-                                  (fn [~db [~'_ ~@args]]
-                                    ~body)))))
-
-;; (str (macroexpand-1 '(defevent try-to-craft [db id]
-;;   (if-let [recipe (crafting-recipes id)]
-;;     (let [t (update (zipmap (keys recipe)
-;;                             (map - (vals recipe))) id inc)]
-;;       (if (valid-transaction? (db :inventory) t)
-;;         (-> db
-;;             (update :inventory do-transaction t)
-;;             (add-message (str "You crafted " (kw->str 1 id))))
-;;         (add-message db "You don't have the items to craft that")))
-;;     (add-message db "You can't craft that")))))
+   `(defn ~name [~@args]
+      (swap! ~'gamething.game/db (fn [~db] ~body))
+      (js/console.log ~(str name "ed"))
+      )))

@@ -34,6 +34,8 @@
    :history '()
    :time          0
    :reverse-time? nil
+   :tiles nil
+   :message-log   []
    :current-dir  [0 0]
    :move-dir     [0 0]
    :cave          {:level        nil
@@ -42,7 +44,6 @@
                    :pos          [0 0]
                    :player-emoji "😀"
                    }
-   :message-log   []
    :places        [:home :cave :garden :cards :crafting :inventory :store]
    :current-place :home
    })

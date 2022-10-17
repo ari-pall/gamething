@@ -33,6 +33,7 @@
              :name   "player"
              :player true
              :container {}
+             ;; :random-movement true
              })
 
 (def spider {:char          "🕷"

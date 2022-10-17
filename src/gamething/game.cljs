@@ -1,51 +1,51 @@
 (ns gamething.game
   (:require
    ;; [re-com.core :as re :refer [at]]
-   [re-frame.core :as rf :refer [reg-sub reg-event-db reg-event-fx reg-fx dispatch subscribe]]
+   ;; [re-frame.core :as rf :refer [reg-sub reg-event-db reg-event-fx reg-fx dispatch subscribe]]
    [goog.events]
    ;; [spade.util]
    ;; [spade.core]
    ;; [spade.runtime]
-   [reagent.dom :as rdom]
+   ;; [reagent.dom :as rdom]
    [gamething.db :as db]
    [gamething.prototypes :as p]
-   [day8.re-frame.tracing :refer-macros [fn-traced]]
+   ;; [day8.re-frame.tracing :refer-macros [fn-traced]]
    ;; [schema.core :as s :include-macros true]
-   [uix.core :refer [defui $]]
-   [uix.dom]
-   [stylo.core :refer [c]]
+   ;; [stylo.core :refer [c]]
    [dumdom.core :refer [defcomponent]]
    [dumdom.dom]
+   [promesa.core :as promesa]
    ;; [minicosm.core :refer [start!]]
    ;; [minicosm.ddn :refer [render-to-canvas]]
-   ;; [rum.core :as rum :refer [defc reactive react]]
+   [goog.async.nextTick]
+   [cljs.core.async :refer [chan alts! put! go <! >! timeout close!]]
+   [stylefy.core :as stylefy :refer [use-style]]
+   [stylefy.generic-dom :as stylefy-generic-dom]
    )
   (:require-macros [gamething.macros :refer [defsub defevent]]))
 
 
-5
+;; (stylefy/keyframes "simple-animation"
+;;                        [:from
+;;                         {:opacity 0}]
+;;                        [:to
+;;                         {:opacity 1}])
 
-(defcomponent heading
-  :on-render (fn [dom-node val old-val])
-  [data]
-  [:h2 {:style {:background "#000"}} (:text data)])
 
-(defcomponent thing [{:keys [n]}]
-  [:div.select-none
-    [:p (str n)]])
+chan
+promesa/promise
+dumdom.core/set-event-handler!
+<!
+>!
+put!
+cljs.core.async/untap-all*
+go
+cljs.core.async/alts!
+cljs.core.async/timeout
+goog.async.nextTick
 
-(dumdom.core/render
- [thing {:n 5}]
- (js/document.getElementById "app"))
-
-;; dumdom.core/render
-;; dumdom.core/defcomponent
-;; uix.core/create-context
-;; uix.core/use-context
-;; uix.core/use-ref
-;; defui
-;; (js/document.getElementById "canvas")
-;; uix.dom/
+(def db (atom nil))
+;; (declare render!)
 (comment
   (render-to-canvas 4 4 (.getElementById js/document "app"))
   )
@@ -53,15 +53,9 @@
 (defn valid-transaction? [inv t] (not-any? neg? (vals (merge-with + t (select-keys inv (keys t))))))
 (defn do-transaction [inv t] (merge-with + inv t))
 
-(def db re-frame.db/app-db)
-;; (reg-event-db :init (fn-traced [_ _]
-;;                                db/default-db))
-
-(defsub inventory :inventory)
-;; (reg-sub :inventory :-> :inventory)
-;; (reg-event-db :do (fn [db [_ f]] (f db)))
-(defsub sget [db path] (get-in db path))
-(defsub none [] [[u] [(sget [:cake])]] #(do nil))
+;; (defsub inventory :inventory)
+;; (defsub sget [db path] (get-in db path))
+;; (defsub none [] [[u] [(sget [:cake])]] #(do nil))
 (defn vec- [& vs] (apply mapv - vs))
 (defn vec+ [& vs] (apply mapv + vs))
 (defn kw->str
@@ -92,19 +86,19 @@
             (add-message (str "You crafted " (kw->str 1 id))))
         (add-message db "You don't have the items to craft that")))
     (add-message db "You can't craft that")))
-(defsub crafting-menu [] [[inv] [(inventory)]]
-  [:div.p-7.flex.flex-col.w-80.space-y-2
-   [:p.text-yellow-400.p-1 "You have:"]
-   (doall (for [[id recipe] crafting-recipes]
-            (let [num (or (get inv id) 0)]
-              ^{:key id} [:button.rounded-full.bg-gray-300.hover:bg-green-300.py-1
-                          {:on-click #(try-to-craft id)}
-                          (kw->str num id)])) )])
-(defsub inventory-menu [] [[inv] [(inventory)]]
-  [:div.p-7.flex-col.flex.w-80.space-y-2
-   [:p.text-yellow-400.p-1 "You have:"]
-   (for [[id num] inv]
-     ^{:key id} [:p (kw->str num id)])])
+;; (defsub crafting-menu [] [[inv] [(inventory)]]
+;;   [:div.p-7.flex.flex-col.w-80.space-y-2
+;;    [:p.text-yellow-400.p-1 "You have:"]
+;;    (doall (for [[id recipe] crafting-recipes]
+;;             (let [num (or (get inv id) 0)]
+;;               ^{:key id} [:button.rounded-full.bg-gray-300.hover:bg-green-300.py-1
+;;                           {:on-click #(try-to-craft id)}
+;;                           (kw->str num id)])) )])
+;; (defsub inventory-menu [] [[inv] [(inventory)]]
+;;   [:div.p-7.flex-col.flex.w-80.space-y-2
+;;    [:p.text-yellow-400.p-1 "You have:"]
+;;    (for [[id num] inv]
+;;      ^{:key id} [:p (kw->str num id)])])
 (def store-prices {:conveyor-belt 3 :metal-gear 2 :electric-motor 6 :factory 30 :crate 2 :flower-seed 2})
 (defn add-place [db place] (update db :places conj place))
 (defevent try-to-buy [db id]
@@ -117,14 +111,14 @@
           (add-place db :factory)
           db))
       (add-message db "You don't have enough money"))))
-(defsub store-menu [] [_ [(none)]]
-  [:div.p-7.flex-col.flex.w-80.space-y-2
-   [:p.text-yellow-400.p-1 "You can buy:"]
-   (for [[id price] store-prices]
-     ^{:key id} [:button.rounded-full.bg-gray-300.hover:bg-green-300.py-1
-                 {:on-click  #(try-to-buy id)}
-                 (str (kw->str 1 id) " for " price " moneys")])])
-(defsub all str)
+;; (defsub store-menu [] [_ [(none)]]
+;;   [:div.p-7.flex-col.flex.w-80.space-y-2
+;;    [:p.text-yellow-400.p-1 "You can buy:"]
+;;    (for [[id price] store-prices]
+;;      ^{:key id} [:button.rounded-full.bg-gray-300.hover:bg-green-300.py-1
+;;                  {:on-click  #(try-to-buy id)}
+;;                  (str (kw->str 1 id) " for " price " moneys")])])
+;; (defsub all str)
 (defevent mouse-down-on-card [db k arg]
   (-> db
       (assoc-in [:drag :held-card] k)
@@ -137,49 +131,44 @@
     (assoc-in db [:cards k :pos] (vec+ (get-in db [:drag :held-card-relative-pos])
                                        [(.-clientX arg) (.-clientY arg)]))
     db))
-(defsub cards :cards)
-(defsub card [k] [[cards] [(cards)]] (cards k))
-(defsub cards-view [] [[cards] [(cards)]]
-  [:div.select-none.overflow-hidden
-   (doall (for [[k card] cards]
-            (let [{[x y] :pos text :text} card]
-              ^{:key k} [:div.absolute.px-5.py-8.rounded-lg.bg-gray-300  ;; .hover:border-solid.hover:border-4.hover:border-black
-                         {:style         {:left x :top y}
-                          :onMouseDown   #(mouse-down-on-card k %1)}
-                         text])))])
-(defsub message-log :message-log)
-(defsub message-log-view [] [[log] [(message-log)]]
-  [:div.flex.flex-col-reverse.bg-stone-700.text-yellow-200.text-sm.overflow-auto.h-full
-   (map-indexed (fn [i message]
-                  ^{:key i} [:p message])
-                log)])
-(defsub places :places)
-(defsub item-count [item] [[inventory] [(inventory)]] (inventory item))
-(defsub factory-objects [db] (get-in db [:factory :objects]))
+;; (defsub cards :cards)
+;; (defsub card [k] [[cards] [(cards)]] (cards k))
+;; (defsub cards-view [] [[cards] [(cards)]]
+;;   [:div.select-none.overflow-hidden
+;;    (doall (for [[k card] cards]
+;;             (let [{[x y] :pos text :text} card]
+;;               ^{:key k} [:div.absolute.px-5.py-8.rounded-lg.bg-gray-300  ;; .hover:border-solid.hover:border-4.hover:border-black
+;;                          {:style         {:left x :top y}
+;;                           :onMouseDown   #(mouse-down-on-card k %1)}
+;;                          text])))])
+;; (defsub message-log :message-log)
+;; (defsub places :places)
+;; (defsub item-count [item] [[inventory] [(inventory)]] (inventory item))
+;; (defsub factory-objects [db] (get-in db [:factory :objects]))
 (def factory-placeables [:thing-maker :conveyor-belt :crate])
-(defn factory []
-  [:div.flex.flew-col.select-none.overflow-hidden
-   [:div.flex.flex-row.m-8.space-x-6.h-16
-    (for [[id text] (cons [:remove "remove"]
-                          (for [[id num] (select-keys @(subscribe [:inventory]) factory-placeables)]
-                            [id (str (kw->str num id))]))]
-      ^{:key id} [:button.rounded-full.bg-gray-300.hover:bg-green-300.p-3.h-12
-                  {:onMouseDown #(dispatch [:do (fn [db] (assoc-in % [:factory :held-object] id))])}
-                  text])]
-   ])
+;; (defn factory []
+;;   [:div.flex.flew-col.select-none.overflow-hidden
+;;    [:div.flex.flex-row.m-8.space-x-6.h-16
+;;     (for [[id text] (cons [:remove "remove"]
+;;                           (for [[id num] (select-keys @(subscribe [:inventory]) factory-placeables)]
+;;                             [id (str (kw->str num id))]))]
+;;       ^{:key id} [:button.rounded-full.bg-gray-300.hover:bg-green-300.p-3.h-12
+;;                   {:onMouseDown #(dispatch [:do (fn [db] (assoc-in % [:factory :held-object] id))])}
+;;                   text])]
+;;    ])
 (defevent set-emoji [db e]
   (-> db
       (assoc :player-emoji e)
       ;; (assoc-in [:cave :player-emoji] e)
       (add-message (str "You picked " e))))
-(defsub home [] [_ [(none)]]
-  [:div.m-6.space-x-2.text-3xl
-   [:p.text-yellow-400.m-3 "Choose your emoji"]
-   (for [e ["🤓" "🐸" "😠" "🤡" "😳" "😔" "😐" "🤤" "🙃" "🙂" ]]
-     ^{:key e} [:button.link {:on-click #(set-emoji e)}
-                e])])
-(defsub garden [] [_ [(none)]]
-  [:p.text-3xl "garden"])
+;; (defsub home [] [_ [(none)]]
+;;   [:div.m-6.space-x-2.text-3xl
+;;    [:p.text-yellow-400.m-3 "Choose your emoji"]
+;;    (for [e ["🤓" "🐸" "😠" "🤡" "😳" "😔" "😐" "🤤" "🙃" "🙂" ]]
+;;      ^{:key e} [:button.link {:on-click #(set-emoji e)}
+;;                 e])])
+;; (defsub garden [] [_ [(none)]]
+;;   [:p.text-3xl "garden"])
 (defn hash-set-conj [set new]
   (conj (or set #{}) new))
 (defn create-item [db item-kw item-pos]
@@ -340,33 +329,49 @@
 (defevent mouse-over-tile [{:keys [c->e->v] :as db} t]
   (assoc db :mouse-on-tile t))
 (def grid-side-length (inc (* 2 view-radius)))
-(def height (str js/window.innerHeight "px"))
+
 (def black-tile [:p.aspect-square {:style {:background-color "#000000"}} " "])
+(def grid-range (range (- view-radius) (inc view-radius)))
+(def reverse-grid-range (reverse grid-range))
 (defn make-tiles [c->e->v [posx posy]]
-  [:div.grid.text-3xl.select-none;; .m-4  ;; .aspect-square
-   {:style {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
-            :height                height
-            :width                 height
-            ;; :position "absolute"
-            }}
-   (for [y (reverse (range (- posy view-radius) (+ 1 posy view-radius)))
-         x (range (- posx view-radius) (+ 1 posx view-radius))]
-     ;; (if visible?
-     ;;   ...
-     ;;   black-tile
-     ;;   )
-     (let [t                  [x y]
-           {:keys [bg-color]} (get-in c->e->v [:tile t])
-           es                 (conj (keys (get-in c->e->v [:container t])) t)
-           chars              (component-values c->e->v :char es)]
-       ^{:key t} [:p.aspect-square
-                  {:style         {:background-color bg-color}
-                   :on-mouse-over #(mouse-over-tile t)}
-                  (last chars)
-                  ;; (rand-nth (filter identity (seq chars)))
-                  ]))])
-;; (component-values (@db :c->e->v) :char [[0 3]])
-(defevent toggle-reverse-time [db] (update db :reverse-time? not))
+  (for [y reverse-grid-range
+        x grid-range
+        ]
+    ;; (if visible?
+    ;;   ...
+    ;;   black-tile
+    ;;   )
+    (let [t                  (vec+ [x y] [posx posy])
+          {:keys [bg-color]} (get-in c->e->v [:tile t])
+          ;; es                 (conj (keys (get-in c->e->v [:container t])) t)
+          ;; chars              (component-values c->e->v :char es)
+          ]
+      ^{:key t}
+      ;; [:p
+      ;;  (merge (use-style {:background-color bg-color})
+      ;;         {:on-mouse-over #(mouse-over-tile t)})
+      ;;  (last chars)
+
+      ;;  ]
+      (dumdom.dom/p
+        (merge (use-style {:background-color bg-color})
+               {:on-mouse-over #(mouse-over-tile t)})
+        (get-in c->e->v [:char (last (conj (keys (get-in c->e->v [:container t])) t))])
+        ;; (last chars)
+        )
+      )))
+
+;; (def height (str js/window.innerHeight "px"))
+;; (stylefy/class "background-transition"
+;;                {:transition "background-color 1s"})
+(defcomponent tiles-view [{:keys [tiles]}]
+  (dumdom.dom/div
+    (use-style {::stylefy/with-classes ["grid text-3xl select-none"]
+                :grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
+                :grid-template-rows    (str "repeat(" grid-side-length ", 1fr)")
+                })
+    tiles))
+(defevent toggle-reverse-time #(update % :reverse-time? not))
 (defevent tick [{:keys [c->e->v reverse-time? time history] :as db}]
   (if reverse-time?
       (if (empty? history)
@@ -380,17 +385,17 @@
           (update :c->e->v random-movement)
           (world-movement)
           (assoc :tiles (make-tiles c->e->v (get-player-pos db))))))
-(defsub current-place [] [[place] [(sget [:current-place])]]
-  (case place
-    :factory   factory
-    :cards     cards-view
-    :crafting  crafting-menu
-    :inventory inventory-menu
-    :store     store-menu
-    :home      home
-    :garden    garden
-    ;; :cave      cave-view
-    ))
+;; (defsub current-place [] [[place] [(sget [:current-place])]]
+;;   (case place
+;;     ;; :factory   factory
+;;     :cards     cards-view
+;;     :crafting  crafting-menu
+;;     :inventory inventory-menu
+;;     :store     store-menu
+;;     :home      home
+;;     :garden    garden
+;;     ;; :cave      cave-view
+;;     ))
 (defevent go-to-place [db place]
   (assoc db :current-place place))
 ;; (def sidebar-style (c :flex))
@@ -404,45 +409,70 @@
 🪄
 📓
 🔍"
-(defsub sidebar [] [[places message-log-view reverse-time?] [(places) (message-log-view) (sget [:reverse-time?])]]
+
+;; (defsub message-log-view [] [[log] [(message-log)]]
+;;   [:div.flex.flex-col-reverse.bg-stone-700.text-yellow-200.text-sm.overflow-auto.h-full
+;;    (map-indexed (fn [i message]
+;;                   ^{:key i} [:p message])
+;;                 log)])
+(defcomponent message-log-view [{:keys [message-log]}]
+  [:div.flex.flex-col-reverse.bg-stone-700.text-yellow-200.text-sm.overflow-auto.h-full
+   (map-indexed (fn [i message]
+                  ^{:key i} [:p message])
+                message-log)])
+(defcomponent sidebar [{:keys [reverse-time? message-log] :as props}]
   [:div.flex.flex-col
    ;; [:grid.]
-    [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-red-800.h-20.w-20.text-3xl
-      {:on-click #(toggle-reverse-time)}
-      (if reverse-time?
-        "←⌛"
-        "⌛→")]
-    [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-green-900
-     {:on-click #(spawn-strange-creature)}
-     "spawn creature"]
-    ;; (for [place places]
-    ;;   ^{:key place} [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-green-900
-    ;;                  {:on-click #(go-to-place place)}
-    ;;                  (kw->str place)])
-    message-log-view]
+   [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-red-800.h-20.w-20.text-3xl
+    {:on-click toggle-reverse-time}
+    (if reverse-time?
+      "←⌛"
+      "⌛→")]
+   [:button.bg-gray-300.hover:bg-green-300.py-1.transition.ease-in-out.text-green-900
+    {:on-click spawn-strange-creature}
+    "spawn creature"]
+   (message-log-view {:message-log message-log})]
   )
-(defsub desc-popup [] [[c->e->v t] [(sget [:c->e->v]) (sget [:mouse-on-tile])]]
+
+(defcomponent desc-popup [{:keys [mouse-on-tile c->e->v]}]
   [:div.flex.flex-col.bg-gray-600.font-mono.text-red-200.text-lg
-   (for [e (conj (keys (get-in c->e->v [:container t])) t)]
+   (for [e (conj (keys (get-in c->e->v [:container mouse-on-tile])) mouse-on-tile)]
      (let [[char name] (entity-components c->e->v e [:char :name])]
        [:p (str char " " name)]))])
+(defcomponent view [{:keys [reverse-time? message-log tiles mouse-on-tile c->e->v] :as props}]
+  (dumdom.dom/div
+    (merge (use-style {::stylefy/with-classes ["h-screen w-screen flex flex-row bg-gray-600 font-mono text-red-200 text-lg overflow-hidden"]})
+           {:onMouseUp     #(mouse-up)
+            :on-mouse-move #(mouse-move %1)
+            })
+    [:div.w-72.flex-none
+     (sidebar (select-keys props [:reverse-time? :message-log]))]
+    (tiles-view {:tiles tiles})
+    (desc-popup (select-keys props [:mouse-on-tile :c->e->v])))
 
-(defn view []
-  [:div.h-screen.w-screen.flex.flex-row.bg-gray-600.font-mono.text-red-200.text-lg.overflow-hidden
-   {:onMouseUp     #(mouse-up)
-    :on-mouse-move #(mouse-move %1)
-    }
-   [:div.w-72.flex-none
-    @(sidebar)]
-   [:canvas#canvas.aspect-square]
-   ;; @(sget [:tiles])
-   @(desc-popup)
+  ;; [:div.h-screen.w-screen.flex.flex-row.bg-gray-600.font-mono.text-red-200.text-lg.overflow-hidden
+  ;;  {:onMouseUp     #(mouse-up)
+  ;;   :on-mouse-move #(mouse-move %1)
+  ;;   }
+  ;;  [:div.w-72.flex-none
+  ;;   (sidebar (select-keys props [:reverse-time? :message-log]))]
+  ;;  ;; [:canvas#canvas.aspect-square]
+  ;;  (tiles-view {:tiles tiles})
+  ;;  (desc-popup (select-keys props [:mouse-on-tile :c->e->v]))
+  ;;  ]
+  )
 
-
-   ])
-
-(defevent init [_] (-> db/default-db
-                       generate-level))
+(defevent init #(-> db/default-db
+                    generate-level))
+(add-watch db :render (let [app-el    (.getElementById js/document "app")
+                            rendering (atom nil)]
+                        (fn [_ _ _ db]
+                          (when-not @rendering
+                            (reset! rendering true)
+                            (dumdom.core/render (view (select-keys db [:reverse-time? :message-log :tiles :mouse-on-tile :c->e->v]))
+                                                app-el)
+                            ;; (js/console.log "rendered")
+                            (reset! rendering false)))))
 
 (comment
 (.fillText context "hello world 🤡" 50 90 140)

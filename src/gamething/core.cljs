@@ -1,36 +1,40 @@
 (ns gamething.core
   (:require
-   [reagent.dom :as rdom]
-   [re-frame.core :as rf]
-   [re-frame.db]
-   [gamething.events :as events]
-   [gamething.game :as game])
+   [stylefy.core :as stylefy]
+   [stylefy.generic-dom :as stylefy-generic-dom]
+   [dumdom.core]
+   ;; [reagent.dom :as rdom]
+   ;; [re-frame.core :as rf]
+   ;; [re-frame.db]
+   [gamething.game :as game]
+   )
   (:require-macros [gamething.macros :refer [defsub defevent]]))
 
 (defn ^:dev/after-load mount-root []
-  (rf/clear-subscription-cache!)
   (let [root-el (.getElementById js/document "app")]
-    (rdom/unmount-component-at-node root-el)
-    (rdom/render [game/view] root-el)))
+    (dumdom.core/unmount root-el)
+    ;; (dumdom.core/render (game/view) root-el)
+    ))
 
-
-(def db gamething.game/db)
-;; (def db re-frame.db/db)
+(def inited (atom nil))
 (defn init []
-  (rf/dispatch-sync [:init
-                     ;; ::events/initialize-db
-                     ])
-
-  (mount-root)
-  (defonce first-messages (do (js/setTimeout #(rf/dispatch [:add-message! "hi"]) 4000)
-                              (js/setTimeout #(rf/dispatch [:add-message! "this is the message log"]) 7000)
-                              (js/setTimeout #(rf/dispatch [:add-message! "it tells you what's happening"]) 10000)))
-  (defonce tick (js/setInterval ;; #(swap! db gamething.game/tick)
-                  #(rf/dispatch-sync [:tick])
-                  120))
-  (.addEventListener js/window "keyup" #(rf/dispatch-sync [:key-up (.-key %)]))
-  (.addEventListener js/window "keydown" #(rf/dispatch-sync [:key-down (.-key %)]))
-  )
+  (when-not @inited
+    (reset! inited true)
+    (stylefy/init {:dom (stylefy-generic-dom/init)})
+    (game/init)
+    (js/setTimeout #(game/add-message! "hi")  4000)
+    (js/setTimeout #(game/add-message! "this is the message log") 7000)
+    (js/setTimeout #(game/add-message! "it tells you what's happening") 10000)
+    (js/setInterval game/tick 1000)
+    (.addEventListener js/window "keyup" #(when-not (.-repeat %)
+                                            (game/key-up (.-key %))
+                                            ;; (js/console.log (str (.-key %) " up"))
+                                            ))
+    (.addEventListener js/window "keydown" #(when-not (.-repeat %)
+                                              (game/key-down (.-key %))
+                                              ;; (js/console.log (str (.-key %) " down"))
+                                              ))
+    ))
 
 ;; (shadow.cljs.devtools.client.browser/ws-status)
 ;; (shadow.cljs.devtools.client.)
