@@ -18,24 +18,28 @@
     ;; (dumdom.core/render (game/view) root-el)
     ))
 
-;; $
 (def inited (atom nil))
 (defn init []
   (when-not @inited
     (reset! inited true)
     ;; (def root (rdom/createRoot (js/document.getElementById "app")))
-    ;; (rdom/createRoot (js/document.getElementById "app"))
     ;; (.- root)
     ;; (.render root ($ app))
-    (add-watch game/db :render (let [app-el    (.getElementById js/document "app")
-                                rendering (atom nil)]
-                            (fn [_ _ _ db]
-                              (when-not @rendering
-                                (reset! rendering true)
-                                (dumdom.core/render (view (select-keys db [:reverse-time? :message-log :tiles :mouse-on-tile :c->e->v]))
-                                                    app-el)
-                                ;; (js/console.log "rendered")
-                                (reset! rendering false)))))
+    (let [root (rdom/createRoot (js/document.getElementById "app"))
+          rendering (atom nil)]
+      (.render root ($ game/view))
+      (add-watch game/db :render (fn [_ _ _ db]
+                                   (@game/setter db)
+                                     ))
+      ;; (add-watch game/db :render (fn [_ _ _ db]
+      ;;                              (when-not @rendering
+      ;;                                (reset! rendering true)
+      ;;                                (.render root ($ game/view ;; db
+      ;;                                                 ;; (select-keys db [:reverse-time? :message-log :tiles :mouse-on-tile :c->e->v])
+      ;;                                                 ))
+      ;;                                (reset! rendering false))))
+      )
+
     (stylefy/init {:dom (stylefy-generic-dom/init)})
     (game/init)
     (js/setTimeout #(game/add-message! "hi")  4000)
