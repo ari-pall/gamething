@@ -13,7 +13,7 @@
    ;; [schema.core :as s :include-macros true]
    ;; [stylo.core :refer [c]]
    [dumdom.core :refer [defcomponent]]
-   [dumdom.dom]
+   [dumdom.dom :refer [div p button]]
    [promesa.core :as promesa]
    ;; [minicosm.core :refer [start!]]
    ;; [minicosm.ddn :refer [render-to-canvas]]
@@ -21,6 +21,10 @@
    [cljs.core.async :refer [chan alts! put! go <! >! timeout close!]]
    [stylefy.core :as stylefy :refer [use-style]]
    [stylefy.generic-dom :as stylefy-generic-dom]
+   [helix.core :refer [defnc $]]
+   [helix.hooks :as hooks]
+   [helix.dom :as d]
+   ["react-dom/client" :as rdom]
    )
   (:require-macros [gamething.macros :refer [defsub defevent]]))
 
@@ -341,7 +345,7 @@ goog.async.nextTick
     ;;   ...
     ;;   black-tile
     ;;   )
-    (let [t                  (vec+ [x y] [posx posy])
+    (let [t                  [(+ x posx) (+ y posy)]
           {:keys [bg-color]} (get-in c->e->v [:tile t])
           ;; es                 (conj (keys (get-in c->e->v [:container t])) t)
           ;; chars              (component-values c->e->v :char es)
@@ -354,8 +358,7 @@ goog.async.nextTick
 
       ;;  ]
       (dumdom.dom/p
-        (merge (use-style {:background-color bg-color})
-               {:on-mouse-over #(mouse-over-tile t)})
+        (use-style {:background-color bg-color})
         (get-in c->e->v [:char (last (conj (keys (get-in c->e->v [:container t])) t))])
         ;; (last chars)
         )
@@ -369,6 +372,8 @@ goog.async.nextTick
     (use-style {::stylefy/with-classes ["grid text-3xl select-none"]
                 :grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
                 :grid-template-rows    (str "repeat(" grid-side-length ", 1fr)")
+                :width "100vh"
+                :height "100vh"
                 })
     tiles))
 (defevent toggle-reverse-time #(update % :reverse-time? not))
@@ -439,27 +444,69 @@ goog.async.nextTick
    (for [e (conj (keys (get-in c->e->v [:container mouse-on-tile])) mouse-on-tile)]
      (let [[char name] (entity-components c->e->v e [:char :name])]
        [:p (str char " " name)]))])
+(def grid-overlay (for [y reverse-grid-range
+                        x grid-range
+                        ]
+                    ^{:key [x y]} (div (merge (use-style {::stylefy/with-classes ["bg-white opacity-0 hover:opacity-20 hover:animate-pulse"]
+                                                          ;; :position              "fixed"
+                                                          ;; :height                "100vh"
+                                                          ;; :width                 "100vh"
+                                                          ;; :left                  "30vh"
+                                                          })
+                                              {;; :on-mouse-over #(mouse-over-tile t)
+                                               }))))
+(defcomponent overlay-grid []
+  (div (use-style {::stylefy/with-classes ["grid select-none"]
+                   :position              "fixed"
+                   :left                  "30vh"
+                   :width                 "100vh"
+                   :height                "100vh"
+                   :grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
+                   :grid-template-rows    (str "repeat(" grid-side-length ", 1fr)")
+                   })
+       (for [y reverse-grid-range
+             x grid-range
+             ]
+         ^{:key [x y]} (div (merge (use-style {::stylefy/with-classes ["bg-white opacity-0 hover:opacity-20 hover:animate-pulse"]
+                                               })
+                                   {;; :on-mouse-over #(mouse-over-tile t)
+                                    })))))
 (defcomponent view [{:keys [reverse-time? message-log tiles mouse-on-tile c->e->v] :as props}]
-  (dumdom.dom/div
-    (merge (use-style {::stylefy/with-classes ["h-screen w-screen flex flex-row bg-gray-600 font-mono text-red-200 text-lg overflow-hidden"]})
-           {:onMouseUp     #(mouse-up)
-            :on-mouse-move #(mouse-move %1)
-            })
-    [:div.w-72.flex-none
-     (sidebar (select-keys props [:reverse-time? :message-log]))]
-    (tiles-view {:tiles tiles})
-    (desc-popup (select-keys props [:mouse-on-tile :c->e->v])))
-
-  ;; [:div.h-screen.w-screen.flex.flex-row.bg-gray-600.font-mono.text-red-200.text-lg.overflow-hidden
-  ;;  {:onMouseUp     #(mouse-up)
-  ;;   :on-mouse-move #(mouse-move %1)
-  ;;   }
-  ;;  [:div.w-72.flex-none
-  ;;   (sidebar (select-keys props [:reverse-time? :message-log]))]
-  ;;  ;; [:canvas#canvas.aspect-square]
-  ;;  (tiles-view {:tiles tiles})
-  ;;  (desc-popup (select-keys props [:mouse-on-tile :c->e->v]))
-  ;;  ]
+  (div (merge (use-style {::stylefy/with-classes ["h-screen w-screen bg-gray-600 font-mono text-red-200 text-lg overflow-hidden"]})
+              {:onMouseUp     #(mouse-up)
+               :on-mouse-move #(mouse-move %1)
+               })
+       (div (use-style {::stylefy/with-classes ["flex-none"]
+                        :position              "fixed"
+                        :height                "100vh"
+                        :width                 "30vh"
+                        })
+            (sidebar (select-keys props [:reverse-time? :message-log])))
+       (div (use-style {::stylefy/with-classes ["grid text-3xl select-none"]
+                        :position              "fixed"
+                        :left                  "30vh"
+                        :width                 "100vh"
+                        :height                "100vh"
+                        :grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
+                        :grid-template-rows    (str "repeat(" grid-side-length ", 1fr)")
+                        })
+            tiles)
+       (overlay-grid)
+       ;; (div (use-style {::stylefy/with-classes ["grid select-none"]
+       ;;                  :position              "fixed"
+       ;;                  :left                  "30vh"
+       ;;                  :width                 "100vh"
+       ;;                  :height                "100vh"
+       ;;                  :grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
+       ;;                  :grid-template-rows    (str "repeat(" grid-side-length ", 1fr)")
+       ;;                  })
+       ;;      grid-overlay)
+       (div (use-style {:position              "fixed"
+                        :left                  "130vh"
+                        :height                "100vh"
+                        })
+            (desc-popup (select-keys props [:mouse-on-tile :c->e->v])))
+       )
   )
 
 (defevent init #(-> db/default-db
