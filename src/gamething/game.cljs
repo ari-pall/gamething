@@ -35,7 +35,6 @@
 
 chan
 promesa/promise
-dumdom.core/set-event-handler!
 <!
 >!
 put!
@@ -340,8 +339,10 @@ goog.async.nextTick
           ;; es                 (conj (keys (get-in c->e->v [:container t])) t)
           ;; chars              (component-values c->e->v :char es)
           ]
-      (d/p {:key t
-            :style {:background-color bg-color}}
+      (d/p {& {:key   t
+               :style {:background-color bg-color}}}
+           ;; {:key t
+           ;;  :style {:background-color bg-color}}
            (get-in c->e->v [:char (last (conj (keys (get-in c->e->v [:container t])) t))])
            ;; (last chars)
            ))))
@@ -417,11 +418,9 @@ goog.async.nextTick
   (d/div {:class "flex flex-col bg-gray-600 font-mono text-red-200 text-lg"}
          (let [t (vec+ mouse-over-relative-coord (get-player-pos db))]
            (for [e (conj (keys (get-in c->e->v [:container t])) t)]
-                       (let [[char name] (entity-components c->e->v e [:char :name])]
-                         (d/p ;; char " " name
-                              (str char " " name)
-                              )))))
-  )
+             (let [[char name] (entity-components c->e->v e [:char :name])]
+               (d/p {& {:key e}} ;; char " " name
+                    char " " name))))))
 (defevent mouse-over-relative-coord [db coord]
   (assoc db :mouse-over-relative-coord coord))
 (defnc overlay-grid []
