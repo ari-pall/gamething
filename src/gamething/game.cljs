@@ -44,7 +44,7 @@ cljs.core.async/alts!
 cljs.core.async/timeout
 goog.async.nextTick
 
-(def db (atom nil))
+;; (def db (atom nil))
 
 (def setter (atom nil))
 (comment
@@ -54,9 +54,6 @@ goog.async.nextTick
 (defn valid-transaction? [inv t] (not-any? neg? (vals (merge-with + t (select-keys inv (keys t))))))
 (defn do-transaction [inv t] (merge-with + inv t))
 
-;; (defsub inventory :inventory)
-;; (defsub sget [db path] (get-in db path))
-;; (defsub none [] [[u] [(sget [:cake])]] #(do nil))
 (defn vec- [& vs] (apply mapv - vs))
 (defn vec+ [& vs] (apply mapv + vs))
 (defn kw->str
@@ -77,29 +74,6 @@ goog.async.nextTick
                        :stick          {}
                        :thing-maker {:conveyor-belt 1 :metal-gear 1 :electric-motor 1}
                        })
-(defevent try-to-craft [db id]
-  (if-let [recipe (crafting-recipes id)]
-    (let [t (update (zipmap (keys recipe)
-                            (map - (vals recipe))) id inc)]
-      (if (valid-transaction? (db :inventory) t)
-        (-> db
-            (update :inventory do-transaction t)
-            (add-message (str "You crafted " (kw->str 1 id))))
-        (add-message db "You don't have the items to craft that")))
-    (add-message db "You can't craft that")))
-;; (defsub crafting-menu [] [[inv] [(inventory)]]
-;;   [:div.p-7.flex.flex-col.w-80.space-y-2
-;;    [:p.text-yellow-400.p-1 "You have:"]
-;;    (doall (for [[id recipe] crafting-recipes]
-;;             (let [num (or (get inv id) 0)]
-;;               ^{:key id} [:button.rounded-full.bg-gray-300.hover:bg-green-300.py-1
-;;                           {:on-click #(try-to-craft id)}
-;;                           (kw->str num id)])) )])
-;; (defsub inventory-menu [] [[inv] [(inventory)]]
-;;   [:div.p-7.flex-col.flex.w-80.space-y-2
-;;    [:p.text-yellow-400.p-1 "You have:"]
-;;    (for [[id num] inv]
-;;      ^{:key id} [:p (kw->str num id)])])
 (def store-prices {:conveyor-belt 3 :metal-gear 2 :electric-motor 6 :factory 30 :crate 2 :flower-seed 2})
 (defn add-place [db place] (update db :places conj place))
 (defevent try-to-buy [db id]
@@ -142,9 +116,6 @@ goog.async.nextTick
 ;;                          {:style         {:left x :top y}
 ;;                           :onMouseDown   #(mouse-down-on-card k %1)}
 ;;                          text])))])
-;; (defsub message-log :message-log)
-;; (defsub places :places)
-;; (defsub item-count [item] [[inventory] [(inventory)]] (inventory item))
 ;; (defsub factory-objects [db] (get-in db [:factory :objects]))
 (def factory-placeables [:thing-maker :conveyor-belt :crate])
 ;; (defn factory []
@@ -206,6 +177,9 @@ goog.async.nextTick
                       (prob 0.001 ) (-> db
                                         (create-tile p/grass pos)
                                         (create-entity p/rabbit pos))
+                      (prob 0.001 ) (-> db
+                                        (create-tile p/grass pos)
+                                        (create-entity p/enemy pos))
                       (prob 0.01) (-> db
                                        (create-tile p/grass pos)
                                        (create-item :loot pos))
@@ -339,10 +313,10 @@ goog.async.nextTick
           ;; es                 (conj (keys (get-in c->e->v [:container t])) t)
           ;; chars              (component-values c->e->v :char es)
           ]
+
       (d/p {& {:key   t
-               :style {:background-color bg-color}}}
-           ;; {:key t
-           ;;  :style {:background-color bg-color}}
+               :style {:background-color bg-color}}
+            }
            (get-in c->e->v [:char (last (conj (keys (get-in c->e->v [:container t])) t))])
            ;; (last chars)
            ))))
@@ -350,11 +324,30 @@ goog.async.nextTick
 ;;                {:transition "background-color 1s"})
 (stylefy.core/class "grid-style" {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
                                   :grid-template-rows    (str "repeat(" grid-side-length ", 1fr)")
+                                  :position              "fixed"
+                                  :left                  "30vh"
+                                  :width                 "100vh"
+                                  :height                "100vh"
                                   })
+;; (defn random-movement [c->e->v]
+;;   (let [affected (keys (c->e->v :random-movement))
+;;         pos-es (component-values c->e->v :pos affected)]
+;;     (reduce (fn [c->e->v [e pos]]
+;;               (let [destination (vec+ pos (rand-nth [[1 0] [-1 0] [0 1] [0 -1]]))]
+;;                 (if (and (prob 0.3) (= :floor (get-in c->e->v [:tile destination :type])))
+;;                   (container-transfer c->e->v pos destination {e 1})
+;;                   c->e->v)))
+;;             c->e->v
+;;             (map vector affected pos-es))))
+(defn enemy-movement [db]
+  (let [player-pos (get-player-pos db)
+        affected (keys (db :enemy-movement))]
+    ;; ...
+    db
+    ))
 (defevent toggle-reverse-time #(update % :reverse-time? not))
 (defevent tick [{:keys [c->e->v reverse-time? time history] :as db}]
   (do
-  ;; (js/console.log (get-player-pos db))
   (if reverse-time?
       (if (empty? history)
         (assoc db :reverse-time? nil)
@@ -366,52 +359,49 @@ goog.async.nextTick
           (update :history conj c->e->v)
           (update :c->e->v random-movement)
           (world-movement)
+          (enemy-movement)
           (assoc :tiles (make-tiles c->e->v (get-player-pos db))))))
     )
-;; (defsub current-place [] [[place] [(sget [:current-place])]]
-;;   (case place
-;;     ;; :factory   factory
-;;     :cards     cards-view
-;;     :crafting  crafting-menu
-;;     :inventory inventory-menu
-;;     :store     store-menu
-;;     :home      home
-;;     :garden    garden
-;;     ;; :cave      cave-view
-;;     ))
-;; (tick)
 (defevent go-to-place [db place]
   (assoc db :current-place place))
 (defevent spawn-strange-creature [db] (-> db
                                           (add-message "you spawned a strange creature")
                                           (create-entity {:random-movement true
                                                              :name            "strange creature"
-                                                             :char            (rand-nth ["🦵" "🤖" "🦋" "👁" "👿" "🐦" "🦈"])}
+                                                             :char            (rand-nth ["🦵" "🤖" "🦋" "👁" "🐦" "🦈"])}
                                                          (get-player-pos db))))
 
-"🧰
-👜
-🪄
-📓
-🔍"
 (defnc message-log-view [{:keys [message-log]}]
   (d/div {:class "flex flex-col-reverse bg-stone-700 text-yellow-200 text-sm overflow-auto h-full"}
          (map-indexed (fn [i message]
-                        (d/p {:key i} message)
+                        (d/p {& {:key i}} message)
                         )
                 message-log))
   )
+(defnc grid-button [{:keys [on-click children]}]
+  (d/button {:class    "hover:text-4xl h-14 focus:outline-none hover:bg-green-300"
+             & {:on-click on-click}}
+            children))
+(defevent set-current-view [db view]
+  (assoc db :current-view view))
 (defnc sidebar [{:keys [reverse-time? message-log] :as props}]
   ;; (js/console.log props)
   (d/div {:class "flex flex-col"}
-         (d/button {:class    "bg-gray-300 hover:bg-green-300 py-1 transition ease-in-out text-red-800 h-20 w-20 text-3xl"
-                    :on-click toggle-reverse-time}
-                   (if reverse-time?
-                     "←⌛"
-                     "⌛→"))
-         (d/button {:class    "bg-gray-300 hover:bg-green-300 py-1 transition ease-in-out text-green-900"
-                    :on-click spawn-strange-creature}
-                   "spawn creature")
+         (d/div {:class "grid grid-cols-4 auto-rows-fr select-none bg-gray-300 text-3xl text-black"
+                 }
+                ($ grid-button {:on-click #(set-current-view :world-view)} "👀")
+                ($ grid-button {:on-click #(set-current-view :abilities-view)} "🪄")
+                ($ grid-button {:on-click spawn-strange-creature} "🔎")
+                ($ grid-button {:on-click #(set-current-view :inventory-view)} "👜")
+                ($ grid-button {:on-click #(set-current-view :stats-view)} "📜")
+                ($ grid-button {:on-click #(set-current-view :crafting-view)} "🧰")
+                ($ grid-button {:on-click spawn-strange-creature} "👿")
+                ($ grid-button {:on-click toggle-reverse-time} (if reverse-time?
+                                                                 "←⌛"
+                                                                 "⌛→"))
+
+                )
+
          ($ message-log-view {& {:message-log message-log}}))
   )
 (defnc desc-popup [{:keys [mouse-over-relative-coord c->e->v] :as db}]
@@ -425,21 +415,72 @@ goog.async.nextTick
   (assoc db :mouse-over-relative-coord coord))
 (defnc overlay-grid []
   (d/div {:class "grid grid-style select-none"
-          :style {:position "fixed"
-                  :left     "30vh"
-                  :width    "100vh"
-                  :height   "100vh"
-                  }}
+          }
          (for [y reverse-grid-range
                x grid-range]
-           (d/div {:class         "bg-white opacity-0 hover:opacity-20 hover:animate-pulse"
-                   :key           [x y]
-                   :on-mouse-over #(mouse-over-relative-coord [x y])
+           (d/div {:class "bg-white opacity-0 hover:opacity-20 hover:animate-pulse"
+                   &      {:key           [x y]
+                           :on-mouse-over #(mouse-over-relative-coord [x y])
+                           }
+                   ;; :key           [x y]
+                   ;; :on-mouse-over #(mouse-over-relative-coord [x y])
                    }))))
 (def overlay-grid-element ($ overlay-grid))
 (def initial-db (generate-level db/default-db))
-(defnc view []
-  (let [[{:keys [tiles c->e->v reverse-time?] :as db} set-state!] (hooks/use-state initial-db)]
+
+(stylefy/class "right-of-sidebar" {:position "fixed"
+                                   :height   "100vh"
+                                   :left     "30vh"})
+(defnc inventory-view [{:keys [c->e->v] :as db}]
+  (let [player-id  (get-player-id db)
+        player-inv (get-in c->e->v [:container player-id])]
+    ;; (js/console.log (str player-inv))
+    (d/div {:class "right-of-sidebar p-7 flex-col flex w-80 space-y-2"}
+           (d/p {:class "text-yellow-400 p-1"}
+                "You have:")
+           (for [[id num] player-inv]
+             (d/p {:key id}
+                  (kw->str num id))))))
+(defevent try-to-craft [{:keys [c->e->v] :as db} id]
+  (if-let [recipe (crafting-recipes id)]
+    (let [t (update (zipmap (keys recipe)
+                            (map - (vals recipe))) id inc)
+          player-id (get-player-id db)
+          player-inv (get-in c->e->v [:container player-id])
+          ]
+      (if (valid-transaction? player-inv t)
+        (-> db
+            (update-in [:c->e->v :container player-id] do-transaction t)
+            (add-message (str "You crafted " (kw->str 1 id))))
+        (add-message db "You don't have the items to craft that")))
+    (add-message db "You can't craft that")))
+
+(defnc crafting-view [{:keys [c->e->v] :as db}]
+  (let [player-id  (get-player-id db)
+        player-inv (get-in c->e->v [:container player-id])]
+    ;; (js/console.log (str player-inv))
+    (d/div {:class "right-of-sidebar p-7 text-black flex-col flex w-80 space-y-2"}
+           (d/p {:class "p-1"}
+                "You have:")
+           (for [[id recipe] crafting-recipes]
+             (let [num (or (get player-inv id) 0)]
+               (d/button {:class "rounded-full bg-gray-300 hover:bg-green-300 py-1"
+                          & {:key id
+                             :on-click #(try-to-craft id)}}
+                         (kw->str num id)))))))
+(defnc world-view [{:keys [tiles] :as db}]
+  (<>
+    (d/div {:class "grid grid-style text-3xl select-none"
+            }
+           tiles)
+    overlay-grid-element
+    (d/div {:style {:position "fixed"
+                    :left     "130vh"
+                    :height   "100vh"
+                    }}
+           ($ desc-popup {& (select-keys db [:mouse-over-relative-coord :c->e->v])}))))
+(defnc main-view []
+  (let [[{:keys [tiles c->e->v reverse-time? current-view] :as db} set-state!] (hooks/use-state initial-db)]
     (defonce aa (reset! setter set-state!))
     (d/div {:onMouseUp     #(mouse-up)
             :on-mouse-move #(mouse-move %1)
@@ -448,27 +489,15 @@ goog.async.nextTick
            (d/div {:class "flex-none"
                    :style {:position "fixed"
                            :height   "100vh"
-                           :width    "30vh"}
-
-                   }
+                           :width    "30vh"}}
                   ($ sidebar {& (select-keys db [:reverse-time? :message-log])}))
-           ;; (js/console.log (first tiles))
-           (d/div {:class "grid grid-style text-3xl select-none"
-                   :style {:position "fixed"
-                           :left     "30vh"
-                           :width    "100vh"
-                           :height   "100vh"
-                           }
-                   }
-                  tiles)
-           overlay-grid-element
-           (d/div {:style {:position "fixed"
-                           :left      "130vh"
-                           :height    "100vh"
-                           }}
-                  ($ desc-popup {& (select-keys db [:mouse-over-relative-coord :c->e->v])})
-                  )
-           )))
+           (case current-view
+             :world-view     ($ world-view {& (select-keys db [:tiles :mouse-over-relative-coord :c->e->v])})
+             :inventory-view ($ inventory-view {& (select-keys db [:c->e->v])})
+             :crafting-view  ($ crafting-view {& (select-keys db [:c->e->v])})
+             ;; :stats-view     ($ stats-view (select-keys db [:c->e->v]))
+             ;; :abilities-view ($ abilities-view (select-keys db [:c->e->v]))
+             (d/p {:class "right-of-sidebar"} (kw->str current-view))))))
 
 (defevent init #(-> db/default-db
                     generate-level))
@@ -483,9 +512,6 @@ goog.async.nextTick
   aget
   (def canvas (js/document.getElementById "canvas"))
   (def context (.getContext (js/document.getElementById "canvas") "2d"))
-  (render (<> "You have"
-              (for [item all-items]
-                [(str (inventory item) " " item) (actions inventory item)])
-              ))
+
 
   )

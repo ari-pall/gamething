@@ -4,9 +4,10 @@
    [stylefy.generic-dom :as stylefy-generic-dom]
    [gamething.game :as game]
    ["react-dom/client" :as rdom]
-   [helix.core :refer [defnc $]]
+   [helix.core :refer [defnc]]
    )
-  (:require-macros [gamething.macros :refer [defevent]]))
+  (:require-macros [gamething.macros :refer [defevent]]
+                   [helix.core :refer [$]]))
 
 ;; (defn ^:dev/after-load mount-root []
 ;;   (let [root-el (.getElementById js/document "app")]
@@ -20,10 +21,10 @@
     (reset! inited true)
     (stylefy/init {:dom (stylefy-generic-dom/init)})
     (.render (rdom/createRoot (js/document.getElementById "app"))
-             ($ game/view))
-    (js/setTimeout #(game/add-message! "hi")  4000)
-    (js/setTimeout #(game/add-message! "this is the message log") 7000)
-    (js/setTimeout #(game/add-message! "it tells you what's happening") 10000)
+             ($ game/main-view))
+    ;; (js/setTimeout #(game/add-message! "hi")  4000)
+    ;; (js/setTimeout #(game/add-message! "this is the message log") 7000)
+    ;; (js/setTimeout #(game/add-message! "it tells you what's happening") 10000)
     (js/setInterval game/tick 75)
     (.addEventListener js/window "keyup" #(when-not (.-repeat %)
                                             (game/key-up (.-key %))

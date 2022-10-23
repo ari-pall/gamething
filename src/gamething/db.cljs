@@ -45,5 +45,5 @@
                    :player-emoji "😀"
                    }
    :places        [:home :cave :garden :cards :crafting :inventory :store]
-   :current-place :home
+   :current-view :world-view
    })
