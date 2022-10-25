@@ -1,12 +1,13 @@
 (ns gamething.db)
 
 (def default-db
-  {:inventory {:snowball       1
-               :large-snowball 0
-               :snowman        0
-               :stick          1
-               :money          50
-               }
+  {
+   ;; :inventory {:snowball       1
+   ;;             :large-snowball 0
+   ;;             :snowman        0
+   ;;             :stick          1
+   ;;             :money          50
+   ;;             }
    :cards     {0 {:pos  [700 300]
                   :text "spider"}
                1 {:pos  [900 340]
@@ -28,7 +29,7 @@
                                               2 {:id       :conveyor-belt
                                                  :connects [1 0]}
                                               }}
-   :mouse-on-tile nil
+   :mouse-over-relative-coord nil
    :entity-count 0
    :c->e->v      {}
    :history '()
@@ -38,12 +39,5 @@
    :message-log   []
    :current-dir  [0 0]
    :move-dir     [0 0]
-   :cave          {:level        nil
-                   :current-dir  [0 0]
-                   :move-dir     [0 0]
-                   :pos          [0 0]
-                   :player-emoji "😀"
-                   }
-   :places        [:home :cave :garden :cards :crafting :inventory :store]
    :current-view :world-view
    })

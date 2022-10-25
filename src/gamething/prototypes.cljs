@@ -33,12 +33,14 @@
              :name   "player"
              :player true
              :container {}
-             ;; :random-movement true
              })
 (def enemy {:char "👿"
             :name "enemy"
             :enemy-movement true
             })
+(def snowman {:name            "snowman"
+              :char            "⛄"
+              :random-movement true})
 
 (def spider {:char          "🕷"
              :name          "spider"

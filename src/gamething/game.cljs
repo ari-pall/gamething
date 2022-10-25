@@ -8,8 +8,6 @@
    [gamething.prototypes :as p]
    ;; [schema.core :as s :include-macros true]
    ;; [stylo.core :refer [c]]
-   ;; [dumdom.core :refer [defcomponent]]
-   ;; [dumdom.dom :refer [div p button]]
    [promesa.core :as promesa]
    ;; [minicosm.core :refer [start!]]
    ;; [minicosm.ddn :refer [render-to-canvas]]
@@ -32,19 +30,6 @@
 ;;                        [:to
 ;;                         {:opacity 1}])
 
-
-chan
-promesa/promise
-<!
->!
-put!
-cljs.core.async/untap-all*
-go
-cljs.core.async/alts!
-cljs.core.async/timeout
-goog.async.nextTick
-
-;; (def db (atom nil))
 
 (def setter (atom nil))
 (comment
@@ -75,7 +60,6 @@ goog.async.nextTick
                        :thing-maker {:conveyor-belt 1 :metal-gear 1 :electric-motor 1}
                        })
 (def store-prices {:conveyor-belt 3 :metal-gear 2 :electric-motor 6 :factory 30 :crate 2 :flower-seed 2})
-(defn add-place [db place] (update db :places conj place))
 (defevent try-to-buy [db id]
   (let [t {:money (- (store-prices id)) id 1}]
     (if (valid-transaction? (db :inventory) t)
@@ -83,7 +67,7 @@ goog.async.nextTick
                    (update :inventory do-transaction t)
                    (add-message (str "You bought " (kw->str 1 id))))]
         (if (= id :factory)
-          (add-place db :factory)
+          ;; (add-place db :factory)
           db))
       (add-message db "You don't have enough money"))))
 ;; (defsub store-menu [] [_ [(none)]]
@@ -254,47 +238,80 @@ goog.async.nextTick
   (let [tile-contents (keys (get-in c->e->v [:container t]))
         takeable-items (map first (filter second (map vector tile-contents (component-values c->e->v :takeable tile-contents))))]
     (container-transfer c->e->v t player-id (zipmap takeable-items (map #(get-in c->e->v [:container t %]) takeable-items)))))
+(defn try-to-move [c->e->v e [dirx diry]]
+  (let [pos  (get-in c->e->v [:pos e])
+        m    (vec+ pos [dirx diry])
+        dest (if (some zero? [dirx diry])
+               (if (= :wall (get-in c->e->v [:tile m :type]))
+                 pos
+                 m)
+               (let [[l r]      (map #(vec+ pos %) (case [dirx diry]
+                                                     [1 1]   [[0 1] [1 0]]
+                                                     [1 -1]  [[0 -1] [1 0]]
+                                                     [-1 -1] [[0 -1] [-1 0]]
+                                                     [-1 1]  [[0 1] [-1 0]]))
+                     [lt mt rt] (map #(get-in c->e->v [:tile % :type]) [l m r])]
+                 (cond (= :wall lt rt) pos
+                       (= :wall mt)    (first (rand-nth (filter #(not= :wall (% 1)) [[l lt] [r rt]])))
+                       true            m)))]
+    (container-transfer c->e->v pos dest {e 1})))
 (defn random-movement [c->e->v]
   (let [affected (keys (c->e->v :random-movement))
         pos-es (component-values c->e->v :pos affected)]
-    (reduce (fn [c->e->v [e pos]]
-              (let [destination (vec+ pos (rand-nth [[1 0] [-1 0] [0 1] [0 -1]]))]
-                (if (and (prob 0.3) (= :floor (get-in c->e->v [:tile destination :type])))
-                  (container-transfer c->e->v pos destination {e 1})
-                  c->e->v)))
+    (reduce (fn [c->e->v e]
+              (if (prob 0.1)
+                (try-to-move c->e->v e (rand-nth [[0 1] [0 -1] [-1 0] [1 0]]))
+                c->e->v))
             c->e->v
-            (map vector affected pos-es))))
+            affected)))
 
-(def diag-dirs {[1 1]   [[0 1] [1 0]]
-                [1 -1]  [[0 -1] [1 0]]
-                [-1 -1] [[0 -1] [-1 0]]
-                [-1 1]  [[0 1] [-1 0]]})
-(defn world-movement [{:keys [c->e->v current-dir move-dir] :as db}]
-  (let [player-id       (get-player-id db)
-        pos             (get-player-pos db)
-        dest (if (diag-dirs move-dir)
-               (let [l  (vec+ ((diag-dirs move-dir) 0) pos)
-                     m  (vec+ move-dir pos)
-                     r  (vec+ ((diag-dirs move-dir) 1) pos)
-                     ;; [lt mt rt] (map #(get-in c->e->v [:tile % :type]) [l m r])
-                     lt (get-in c->e->v [:tile l :type])
-                     mt (get-in c->e->v [:tile m :type])
-                     rt (get-in c->e->v [:tile r :type])]
-                 (cond (= :wall lt rt) pos
-                       (= :wall mt)    (first (rand-nth (filter #(not= :wall (% 1)) [[l lt] [r rt]])))
-                       true            m))
-               (let [dest (vec+ move-dir pos)]
-                 (if (= :wall (get-in c->e->v [:tile dest :type]))
-                   pos
-                   dest)))
-        ]
+(defn attack-player [{:keys [c->e->v] :as db} enemy]
+  (add-message db (str (get-in c->e->v [:name enemy]) " attacks you")))
+(defn enemy-movement [{:keys [c->e->v] :as db}]
+  (let [player-pos (get-player-pos db)
+        affected   (keys (c->e->v :enemy-movement))]
+    (assoc db :c->e->v (reduce (fn [c->e->v e]
+                                 (cond (prob 0.3) (try-to-move c->e->v e (let [pos (get-in c->e->v [:pos e])]
+                                                                           (mapv #(cond (<= % -1) -1
+                                                                                        (>= % 1)  1
+                                                                                        true      0)
+                                                                                 (vec- player-pos pos))))
+                                       (prob 0.4) (try-to-move c->e->v e (rand-nth [[0 1] [0 -1] [-1 0] [1 0]]))
+                                       true       c->e->v))
+                               c->e->v
+                               affected))))
+(defn player-movement [{:keys [c->e->v current-dir move-dir] :as db}]
+  (let [player-id (get-player-id db)
+        pos       (get-player-pos db)]
     (-> db
         (assoc :c->e->v (-> c->e->v
-                            (container-transfer pos dest {player-id 1})
-                            (pick-up-items-on-tile dest player-id)))
+                            (pick-up-items-on-tile pos player-id)
+                            (try-to-move player-id move-dir)))
         (assoc :move-dir current-dir))))
-(defevent mouse-over-tile [{:keys [c->e->v] :as db} t]
-  (assoc db :mouse-on-tile t))
+;; (defn world-movement [{:keys [c->e->v current-dir move-dir] :as db}]
+;;   (let [player-id       (get-player-id db)
+;;         pos             (get-player-pos db)
+;;         dest (if (diag-dirs move-dir)
+;;                (let [l  (vec+ ((diag-dirs move-dir) 0) pos)
+;;                      m  (vec+ move-dir pos)
+;;                      r  (vec+ ((diag-dirs move-dir) 1) pos)
+;;                      ;; [lt mt rt] (map #(get-in c->e->v [:tile % :type]) [l m r])
+;;                      lt (get-in c->e->v [:tile l :type])
+;;                      mt (get-in c->e->v [:tile m :type])
+;;                      rt (get-in c->e->v [:tile r :type])]
+;;                  (cond (= :wall lt rt) pos
+;;                        (= :wall mt)    (first (rand-nth (filter #(not= :wall (% 1)) [[l lt] [r rt]])))
+;;                        true            m))
+;;                (let [dest (vec+ move-dir pos)]
+;;                  (if (= :wall (get-in c->e->v [:tile dest :type]))
+;;                    pos
+;;                    dest)))
+;;         ]
+;;     (-> db
+;;         (assoc :c->e->v (-> c->e->v
+;;                             (container-transfer pos dest {player-id 1})
+;;                             (pick-up-items-on-tile dest player-id)))
+;;         (assoc :move-dir current-dir))))
 (def grid-side-length (inc (* 2 view-radius)))
 
 (def black-tile [:p.aspect-square {:style {:background-color "#000000"}} " "])
@@ -329,39 +346,21 @@ goog.async.nextTick
                                   :width                 "100vh"
                                   :height                "100vh"
                                   })
-;; (defn random-movement [c->e->v]
-;;   (let [affected (keys (c->e->v :random-movement))
-;;         pos-es (component-values c->e->v :pos affected)]
-;;     (reduce (fn [c->e->v [e pos]]
-;;               (let [destination (vec+ pos (rand-nth [[1 0] [-1 0] [0 1] [0 -1]]))]
-;;                 (if (and (prob 0.3) (= :floor (get-in c->e->v [:tile destination :type])))
-;;                   (container-transfer c->e->v pos destination {e 1})
-;;                   c->e->v)))
-;;             c->e->v
-;;             (map vector affected pos-es))))
-(defn enemy-movement [db]
-  (let [player-pos (get-player-pos db)
-        affected (keys (db :enemy-movement))]
-    ;; ...
-    db
-    ))
 (defevent toggle-reverse-time #(update % :reverse-time? not))
 (defevent tick [{:keys [c->e->v reverse-time? time history] :as db}]
-  (do
   (if reverse-time?
-      (if (empty? history)
-        (assoc db :reverse-time? nil)
-        (-> db
-            (assoc :c->e->v (first history))
-            (update :history rest)
-            (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
+    (if (empty? history)
+      (assoc db :reverse-time? nil)
       (-> db
-          (update :history conj c->e->v)
-          (update :c->e->v random-movement)
-          (world-movement)
-          (enemy-movement)
-          (assoc :tiles (make-tiles c->e->v (get-player-pos db))))))
-    )
+          (assoc :c->e->v (first history))
+          (update :history rest)
+          (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
+    (-> db
+        (update :history conj c->e->v)
+        (update :c->e->v random-movement)
+        (player-movement)
+        (enemy-movement)
+        (assoc :tiles (make-tiles c->e->v (get-player-pos db))))))
 (defevent go-to-place [db place]
   (assoc db :current-place place))
 (defevent spawn-strange-creature [db] (-> db
@@ -384,6 +383,14 @@ goog.async.nextTick
             children))
 (defevent set-current-view [db view]
   (assoc db :current-view view))
+(defevent try-to-spawn-snowman [{:keys [c->e->v] :as db}]
+  (let [player-id (get-player-id db)
+        [inv pos] (entity-components c->e->v player-id [:container :pos])]
+    (if (valid-transaction? inv {:snowman -1})
+      (-> db
+          (update-in [:c->e->v :container player-id] do-transaction {:snowman -1})
+          (create-entity p/snowman pos))
+      (add-message db "you dont have a snowman"))))
 (defnc sidebar [{:keys [reverse-time? message-log] :as props}]
   ;; (js/console.log props)
   (d/div {:class "flex flex-col"}
@@ -391,10 +398,11 @@ goog.async.nextTick
                  }
                 ($ grid-button {:on-click #(set-current-view :world-view)} "👀")
                 ($ grid-button {:on-click #(set-current-view :abilities-view)} "🪄")
+                ($ grid-button {:on-click try-to-spawn-snowman} "⛄")
                 ($ grid-button {:on-click spawn-strange-creature} "🔎")
                 ($ grid-button {:on-click #(set-current-view :inventory-view)} "👜")
                 ($ grid-button {:on-click #(set-current-view :stats-view)} "📜")
-                ($ grid-button {:on-click #(set-current-view :crafting-view)} "🧰")
+                ($ grid-button {:on-click #(set-current-view :crafting-view)} "🛠")
                 ($ grid-button {:on-click spawn-strange-creature} "👿")
                 ($ grid-button {:on-click toggle-reverse-time} (if reverse-time?
                                                                  "←⌛"
@@ -409,7 +417,7 @@ goog.async.nextTick
          (let [t (vec+ mouse-over-relative-coord (get-player-pos db))]
            (for [e (conj (keys (get-in c->e->v [:container t])) t)]
              (let [[char name] (entity-components c->e->v e [:char :name])]
-               (d/p {& {:key e}} ;; char " " name
+               (d/p {& {:key e}}
                     char " " name))))))
 (defevent mouse-over-relative-coord [db coord]
   (assoc db :mouse-over-relative-coord coord))
@@ -420,11 +428,7 @@ goog.async.nextTick
                x grid-range]
            (d/div {:class "bg-white opacity-0 hover:opacity-20 hover:animate-pulse"
                    &      {:key           [x y]
-                           :on-mouse-over #(mouse-over-relative-coord [x y])
-                           }
-                   ;; :key           [x y]
-                   ;; :on-mouse-over #(mouse-over-relative-coord [x y])
-                   }))))
+                           :on-mouse-over #(mouse-over-relative-coord [x y])}}))))
 (def overlay-grid-element ($ overlay-grid))
 (def initial-db (generate-level db/default-db))
 
@@ -478,7 +482,8 @@ goog.async.nextTick
                     :left     "130vh"
                     :height   "100vh"
                     }}
-           ($ desc-popup {& (select-keys db [:mouse-over-relative-coord :c->e->v])}))))
+           ($ desc-popup {& (select-keys db [:mouse-over-relative-coord :c->e->v])}))
+    ))
 (defnc main-view []
   (let [[{:keys [tiles c->e->v reverse-time? current-view] :as db} set-state!] (hooks/use-state initial-db)]
     (defonce aa (reset! setter set-state!))
@@ -499,8 +504,8 @@ goog.async.nextTick
              ;; :abilities-view ($ abilities-view (select-keys db [:c->e->v]))
              (d/p {:class "right-of-sidebar"} (kw->str current-view))))))
 
-(defevent init #(-> db/default-db
-                    generate-level))
+;; (defevent init #(-> db/default-db
+;;                     generate-level))
 
 (comment
   (.fillText context "hello world 🤡" 50 90 140)
