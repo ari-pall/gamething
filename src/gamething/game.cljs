@@ -39,8 +39,13 @@
 (defn valid-transaction? [inv t] (not-any? neg? (vals (merge-with + t (select-keys inv (keys t))))))
 (defn do-transaction [inv t] (merge-with + inv t))
 
-(defn vec- [& vs] (apply mapv - vs))
-(defn vec+ [& vs] (apply mapv + vs))
+(defn vec- ([a b]
+            (mapv - a b))
+  ([& vs] (apply mapv - vs)))
+(defn vec+ ([a b]
+            (mapv + a b))
+  ([& vs] (apply mapv - vs)))
+;; (defn vec+ [& vs] (apply mapv + vs))
 (defn kw->str
   ([kw] (clojure.string/replace (.-name kw) #"-" " "))
   ([n kw] (let [name (kw->str kw)]
@@ -256,30 +261,28 @@
                        true            m)))]
     (container-transfer c->e->v pos dest {e 1})))
 (defn random-movement [c->e->v]
-  (let [affected (keys (c->e->v :random-movement))
-        pos-es (component-values c->e->v :pos affected)]
+  (let [affected (keys (c->e->v :random-movement))]
     (reduce (fn [c->e->v e]
               (if (prob 0.1)
                 (try-to-move c->e->v e (rand-nth [[0 1] [0 -1] [-1 0] [1 0]]))
                 c->e->v))
             c->e->v
             affected)))
-
 (defn attack-player [{:keys [c->e->v] :as db} enemy]
   (add-message db (str (get-in c->e->v [:name enemy]) " attacks you")))
 (defn enemy-movement [{:keys [c->e->v] :as db}]
   (let [player-pos (get-player-pos db)
-        affected   (keys (c->e->v :enemy-movement))]
-    (assoc db :c->e->v (reduce (fn [c->e->v e]
-                                 (cond (prob 0.3) (try-to-move c->e->v e (let [pos (get-in c->e->v [:pos e])]
-                                                                           (mapv #(cond (<= % -1) -1
-                                                                                        (>= % 1)  1
-                                                                                        true      0)
-                                                                                 (vec- player-pos pos))))
+        affected   (keys (c->e->v :enemy-movement))
+        pos-es (component-values c->e->v :pos affected)]
+    (assoc db :c->e->v (reduce (fn [c->e->v [e pos]]
+                                 (cond (prob 0.3) (try-to-move c->e->v e (mapv #(cond (<= % -1) -1
+                                                                                      (>= % 1)  1
+                                                                                      true      0)
+                                                                               (vec- player-pos pos)))
                                        (prob 0.4) (try-to-move c->e->v e (rand-nth [[0 1] [0 -1] [-1 0] [1 0]]))
                                        true       c->e->v))
                                c->e->v
-                               affected))))
+                               (map vector affected pos-es)))))
 (defn player-movement [{:keys [c->e->v current-dir move-dir] :as db}]
   (let [player-id (get-player-id db)
         pos       (get-player-pos db)]
@@ -330,13 +333,15 @@
           ;; es                 (conj (keys (get-in c->e->v [:container t])) t)
           ;; chars              (component-values c->e->v :char es)
           ]
+      [t bg-color (get-in c->e->v [:char (last (conj (keys (get-in c->e->v [:container t])) t))])]
 
-      (d/p {& {:key   t
-               :style {:background-color bg-color}}
-            }
-           (get-in c->e->v [:char (last (conj (keys (get-in c->e->v [:container t])) t))])
-           ;; (last chars)
-           ))))
+      ;; (d/p {& {:key   t
+      ;;          :style {:background-color bg-color}}
+      ;;       }
+      ;;      (get-in c->e->v [:char (last (conj (keys (get-in c->e->v [:container t])) t))])
+      ;;      ;; (last chars)
+      ;;      )
+      )))
 ;; (stylefy/class "background-transition"
 ;;                {:transition "background-color 1s"})
 (stylefy.core/class "grid-style" {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
@@ -476,7 +481,11 @@
   (<>
     (d/div {:class "grid grid-style text-3xl select-none"
             }
-           tiles)
+           (for [[t bg-color char] tiles]
+             (d/div {:class "overflow-hidden"
+                     &      {:key   t
+                             :style {:background-color bg-color}}}
+                    char)))
     overlay-grid-element
     (d/div {:style {:position "fixed"
                     :left     "130vh"
