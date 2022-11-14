@@ -29,11 +29,21 @@
                                               2 {:id       :conveyor-belt
                                                  :connects [1 0]}
                                               }}
+   :keys {:pressed {:left nil
+                    :right nil
+                    :up nil
+                    :down nil
+                    }
+          :last-x :left
+          :last-y :up
+          }
    :mouse-over-relative-coord nil
+   :scroll-pos 0
+   ;; :target-list []
+   ;; :target-list-scroll-pos 0
    :entity-count 0
-   :c->e->v      {}
+   :c->e->v      {:time 0}
    :history '()
-   :time          0
    :reverse-time? nil
    :tiles nil
    :message-log   []

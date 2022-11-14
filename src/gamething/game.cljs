@@ -4,6 +4,7 @@
    ;; [spade.util]
    ;; [spade.core]
    ;; [spade.runtime]
+   [applied-science.js-interop :as j]
    [gamething.db :as db]
    [gamething.prototypes :as p]
    ;; [schema.core :as s :include-macros true]
@@ -24,6 +25,10 @@
                    [helix.core :refer [$]]))
 
 
+;; (def context (helix.core/create-context nil))
+
+(def client js/module$node_modules$react_dom$client)
+;; (.createRoot client)
 ;; (stylefy/keyframes "simple-animation"
 ;;                        [:from
 ;;                         {:opacity 0}]
@@ -33,6 +38,9 @@
 
 (def setter (atom nil))
 (comment
+
+
+helix.core/provider
   (render-to-canvas 4 4 (.getElementById js/document "app"))
   )
 
@@ -215,6 +223,16 @@
         (assoc-in [:move-dir i] val)
         (assoc-in [:current-dir i] val))
     db))
+(defn clamp [a b c]
+  (min (max a b) c))
+(defn scroll [{:keys [scroll-pos mouse-over-relative-coord] :as db} d]
+  (assoc db :scroll-pos (clamp 0
+                               (+ d scroll-pos)
+                               (dec (count (get-entities-on-relative-coord db mouse-over-relative-coord))))))
+(defevent scroll! [{keys [scroll-pos mouse-over-relative-coord] :as db} d]
+  (do ;; (js/console.log (count db))
+      (scroll db d))
+  )
 (defn entities-on-tile [{:keys [c->e->v] :as db} t]
   (keys (get-in c->e->v [:container t])))
 (defn get-player-id [{:keys [c->e->v] :as db}] (first (first (get-in c->e->v [:player]))))
@@ -240,7 +258,7 @@
 (defn entity-components [c->e->v e cs]
   (map #(% e) (map c->e->v cs)))
 (defn pick-up-items-on-tile [c->e->v t player-id]
-  (let [tile-contents (keys (get-in c->e->v [:container t]))
+  (let [tile-contents  (keys (get-in c->e->v [:container t]))
         takeable-items (map first (filter second (map vector tile-contents (component-values c->e->v :takeable tile-contents))))]
     (container-transfer c->e->v t player-id (zipmap takeable-items (map #(get-in c->e->v [:container t %]) takeable-items)))))
 (defn try-to-move [c->e->v e [dirx diry]]
@@ -273,7 +291,7 @@
 (defn enemy-movement [{:keys [c->e->v] :as db}]
   (let [player-pos (get-player-pos db)
         affected   (keys (c->e->v :enemy-movement))
-        pos-es (component-values c->e->v :pos affected)]
+        pos-es     (component-values c->e->v :pos affected)]
     (assoc db :c->e->v (reduce (fn [c->e->v [e pos]]
                                  (cond (prob 0.3) (try-to-move c->e->v e (mapv #(cond (<= % -1) -1
                                                                                       (>= % 1)  1
@@ -287,34 +305,10 @@
   (let [player-id (get-player-id db)
         pos       (get-player-pos db)]
     (-> db
+        (assoc :move-dir current-dir)
         (assoc :c->e->v (-> c->e->v
                             (pick-up-items-on-tile pos player-id)
-                            (try-to-move player-id move-dir)))
-        (assoc :move-dir current-dir))))
-;; (defn world-movement [{:keys [c->e->v current-dir move-dir] :as db}]
-;;   (let [player-id       (get-player-id db)
-;;         pos             (get-player-pos db)
-;;         dest (if (diag-dirs move-dir)
-;;                (let [l  (vec+ ((diag-dirs move-dir) 0) pos)
-;;                      m  (vec+ move-dir pos)
-;;                      r  (vec+ ((diag-dirs move-dir) 1) pos)
-;;                      ;; [lt mt rt] (map #(get-in c->e->v [:tile % :type]) [l m r])
-;;                      lt (get-in c->e->v [:tile l :type])
-;;                      mt (get-in c->e->v [:tile m :type])
-;;                      rt (get-in c->e->v [:tile r :type])]
-;;                  (cond (= :wall lt rt) pos
-;;                        (= :wall mt)    (first (rand-nth (filter #(not= :wall (% 1)) [[l lt] [r rt]])))
-;;                        true            m))
-;;                (let [dest (vec+ move-dir pos)]
-;;                  (if (= :wall (get-in c->e->v [:tile dest :type]))
-;;                    pos
-;;                    dest)))
-;;         ]
-;;     (-> db
-;;         (assoc :c->e->v (-> c->e->v
-;;                             (container-transfer pos dest {player-id 1})
-;;                             (pick-up-items-on-tile dest player-id)))
-;;         (assoc :move-dir current-dir))))
+                            (try-to-move player-id move-dir))))))
 (def grid-side-length (inc (* 2 view-radius)))
 
 (def black-tile [:p.aspect-square {:style {:background-color "#000000"}} " "])
@@ -333,15 +327,7 @@
           ;; es                 (conj (keys (get-in c->e->v [:container t])) t)
           ;; chars              (component-values c->e->v :char es)
           ]
-      [t bg-color (get-in c->e->v [:char (last (conj (keys (get-in c->e->v [:container t])) t))])]
-
-      ;; (d/p {& {:key   t
-      ;;          :style {:background-color bg-color}}
-      ;;       }
-      ;;      (get-in c->e->v [:char (last (conj (keys (get-in c->e->v [:container t])) t))])
-      ;;      ;; (last chars)
-      ;;      )
-      )))
+      [t bg-color (get-in c->e->v [:char (last (conj (keys (get-in c->e->v [:container t])) t))])])))
 ;; (stylefy/class "background-transition"
 ;;                {:transition "background-color 1s"})
 (stylefy.core/class "grid-style" {:grid-template-columns (str "repeat(" grid-side-length ", 1fr)")
@@ -351,23 +337,6 @@
                                   :width                 "100vh"
                                   :height                "100vh"
                                   })
-(defevent toggle-reverse-time #(update % :reverse-time? not))
-(defevent tick [{:keys [c->e->v reverse-time? time history] :as db}]
-  (if reverse-time?
-    (if (empty? history)
-      (assoc db :reverse-time? nil)
-      (-> db
-          (assoc :c->e->v (first history))
-          (update :history rest)
-          (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
-    (-> db
-        (update :history conj c->e->v)
-        (update :c->e->v random-movement)
-        (player-movement)
-        (enemy-movement)
-        (assoc :tiles (make-tiles c->e->v (get-player-pos db))))))
-(defevent go-to-place [db place]
-  (assoc db :current-place place))
 (defevent spawn-strange-creature [db] (-> db
                                           (add-message "you spawned a strange creature")
                                           (create-entity {:random-movement true
@@ -380,11 +349,10 @@
          (map-indexed (fn [i message]
                         (d/p {& {:key i}} message)
                         )
-                message-log))
-  )
+                message-log)))
 (defnc grid-button [{:keys [on-click children]}]
-  (d/button {:class    "hover:text-4xl h-14 focus:outline-none hover:bg-green-300"
-             & {:on-click on-click}}
+  (d/button {:class "hover:text-4xl h-14 focus:outline-none hover:bg-green-300"
+             &      {:on-click on-click}}
             children))
 (defevent set-current-view [db view]
   (assoc db :current-view view))
@@ -396,9 +364,10 @@
           (update-in [:c->e->v :container player-id] do-transaction {:snowman -1})
           (create-entity p/snowman pos))
       (add-message db "you dont have a snowman"))))
+;; (symbol (str "aaa" "!"))
 (defnc sidebar [{:keys [reverse-time? message-log] :as props}]
-  ;; (js/console.log props)
   (d/div {:class "flex flex-col"}
+         ;; (d/p {:class "border-2 border-solid"} "aaaaa")
          (d/div {:class "grid grid-cols-4 auto-rows-fr select-none bg-gray-300 text-3xl text-black"
                  }
                 ($ grid-button {:on-click #(set-current-view :world-view)} "👀")
@@ -412,20 +381,30 @@
                 ($ grid-button {:on-click toggle-reverse-time} (if reverse-time?
                                                                  "←⌛"
                                                                  "⌛→"))
-
                 )
 
          ($ message-log-view {& {:message-log message-log}}))
   )
-(defnc desc-popup [{:keys [mouse-over-relative-coord c->e->v] :as db}]
+(def x [db dk])
+(defn get-entities-on-relative-coord [{:keys [c->e->v] :as db} relative-coord]
+  (let [t (vec+ relative-coord (get-player-pos db))]
+    ;; (js/console.log (str (conj (keys (get-in c->e->v [:container t])) t)))
+    (conj (keys (get-in c->e->v [:container t])) t)))
+(defnc desc-popup [{:keys [c->e->v mouse-over-relative-coord scroll-pos] :as db}]
+  ;; (js/console.log (str (first (first (get-in c->e->v [:player])))))
   (d/div {:class "flex flex-col bg-gray-600 font-mono text-red-200 text-lg"}
-         (let [t (vec+ mouse-over-relative-coord (get-player-pos db))]
-           (for [e (conj (keys (get-in c->e->v [:container t])) t)]
-             (let [[char name] (entity-components c->e->v e [:char :name])]
-               (d/p {& {:key e}}
-                    char " " name))))))
-(defevent mouse-over-relative-coord [db coord]
+         (map-indexed (fn [i e]
+                        (let [[char name] (entity-components c->e->v e [:char :name])]
+                          (d/p {& {:key   i
+                                   :class (if (= i scroll-pos)
+                                            "border-solid border-2"
+                                            "")}}
+                               char " " name)))
+                      (get-entities-on-relative-coord db mouse-over-relative-coord))))
+(defevent mouse-over-relative-coord [{:keys [c->e->v] :as db} coord]
   (assoc db :mouse-over-relative-coord coord))
+;; (defevent world-click [db tile]
+;;   )
 (defnc overlay-grid []
   (d/div {:class "grid grid-style select-none"
           }
@@ -433,9 +412,28 @@
                x grid-range]
            (d/div {:class "bg-white opacity-0 hover:opacity-20 hover:animate-pulse"
                    &      {:key           [x y]
-                           :on-mouse-over #(mouse-over-relative-coord [x y])}}))))
+                           :on-mouse-over #(mouse-over-relative-coord [x y])
+                           :on-click #()}}))))
 (def overlay-grid-element ($ overlay-grid))
 (def initial-db (generate-level db/default-db))
+(defevent toggle-reverse-time #(update % :reverse-time? not))
+(defevent tick [{:keys [c->e->v reverse-time? time history] :as db}]
+  (-> (if reverse-time?
+        (if (empty? history)
+          (assoc db :reverse-time? nil)
+          (-> db
+              (assoc :c->e->v (first history))
+              (update :history rest)
+              (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
+        (-> db
+            (update :time inc)
+            (update :history conj c->e->v)
+            (update :c->e->v random-movement)
+            (player-movement)
+            (enemy-movement)
+            (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
+      (scroll 0)
+      ))
 
 (stylefy/class "right-of-sidebar" {:position "fixed"
                                    :height   "100vh"
@@ -478,6 +476,7 @@
                              :on-click #(try-to-craft id)}}
                          (kw->str num id)))))))
 (defnc world-view [{:keys [tiles] :as db}]
+  ;; (js/console.log (db :mouse-over-relative-coord))
   (<>
     (d/div {:class "grid grid-style text-3xl select-none"
             }
@@ -491,11 +490,13 @@
                     :left     "130vh"
                     :height   "100vh"
                     }}
-           ($ desc-popup {& (select-keys db [:mouse-over-relative-coord :c->e->v])}))
-    ))
+           ($ desc-popup {& (select-keys db [:c->e->v :mouse-over-relative-coord :scroll-pos])}))))
+
+;; context...
 (defnc main-view []
   (let [[{:keys [tiles c->e->v reverse-time? current-view] :as db} set-state!] (hooks/use-state initial-db)]
     (defonce aa (reset! setter set-state!))
+    ;; (js/console.log (db :mouse-over-relative-coord))
     (d/div {:onMouseUp     #(mouse-up)
             :on-mouse-move #(mouse-move %1)
             :class         "h-screen w-screen bg-gray-600 font-mono text-red-200 text-lg overflow-hidden"
@@ -506,12 +507,14 @@
                            :width    "30vh"}}
                   ($ sidebar {& (select-keys db [:reverse-time? :message-log])}))
            (case current-view
-             :world-view     ($ world-view {& (select-keys db [:tiles :mouse-over-relative-coord :c->e->v])})
+             :world-view     ($ world-view {& (select-keys db [:tiles :scroll-pos :mouse-over-relative-coord :c->e->v])})
              :inventory-view ($ inventory-view {& (select-keys db [:c->e->v])})
              :crafting-view  ($ crafting-view {& (select-keys db [:c->e->v])})
              ;; :stats-view     ($ stats-view (select-keys db [:c->e->v]))
              ;; :abilities-view ($ abilities-view (select-keys db [:c->e->v]))
              (d/p {:class "right-of-sidebar"} (kw->str current-view))))))
+
+
 
 ;; (defevent init #(-> db/default-db
 ;;                     generate-level))
