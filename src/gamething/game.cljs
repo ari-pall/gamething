@@ -36,9 +36,30 @@
 ;;                         {:opacity 1}])
 
 
+(def gotten (atom nil))
+(defevent getter [db]
+  (do (reset! gotten db)
+      db))
+(defn path [& args]
+  (getter)
+  (get-in @gotten args)
+  )
 (def setter (atom nil))
+
+
+
 (comment
 
+
+
+
+  (let [e 5]
+    (filter second (update-vals (path :c->e->v) #(% e))))
+  (update-vals (take 5 (path :c->e->v)) #(% 0))
+
+;; (@gotten :scroll-pos)
+  (str :a " " 4)
+(path :selected-entity)
 
 helix.core/provider
   (render-to-canvas 4 4 (.getElementById js/document "app"))
@@ -230,9 +251,7 @@ helix.core/provider
                                (+ d scroll-pos)
                                (dec (count (get-entities-on-relative-coord db mouse-over-relative-coord))))))
 (defevent scroll! [{keys [scroll-pos mouse-over-relative-coord] :as db} d]
-  (do ;; (js/console.log (count db))
-      (scroll db d))
-  )
+  (scroll db d))
 (defn entities-on-tile [{:keys [c->e->v] :as db} t]
   (keys (get-in c->e->v [:container t])))
 (defn get-player-id [{:keys [c->e->v] :as db}] (first (first (get-in c->e->v [:player]))))
@@ -391,20 +410,26 @@ helix.core/provider
     ;; (js/console.log (str (conj (keys (get-in c->e->v [:container t])) t)))
     (conj (keys (get-in c->e->v [:container t])) t)))
 (defnc desc-popup [{:keys [c->e->v mouse-over-relative-coord scroll-pos] :as db}]
-  ;; (js/console.log (str (first (first (get-in c->e->v [:player])))))
-  (d/div {:class "flex flex-col bg-gray-600 font-mono text-red-200 text-lg"}
-         (map-indexed (fn [i e]
-                        (let [[char name] (entity-components c->e->v e [:char :name])]
-                          (d/p {& {:key   i
-                                   :class (if (= i scroll-pos)
-                                            "border-solid border-2"
-                                            "")}}
-                               char " " name)))
-                      (get-entities-on-relative-coord db mouse-over-relative-coord))))
+  (let [list (get-entities-on-relative-coord db mouse-over-relative-coord)]
+    (d/div {:class "flex flex-col bg-gray-600 font-mono text-red-200 text-lg"}
+           (map-indexed (fn [i e]
+                          (let [[char name] (entity-components c->e->v e [:char :name])]
+                            (d/p {& {:key   i
+                                     :class (if (= i (clamp 0 scroll-pos (dec (count list))))
+                                              "border-solid border-2"
+                                              "")}}
+                                 char " " name)))
+                        list))))
 (defevent mouse-over-relative-coord [{:keys [c->e->v] :as db} coord]
   (assoc db :mouse-over-relative-coord coord))
-;; (defevent world-click [db tile]
-;;   )
+(defevent world-click [{:keys [scroll-pos] :as db} relative-coord]
+  (let [es (get-entities-on-relative-coord db relative-coord)
+        i  (clamp 0 scroll-pos (dec (count es)))
+        e  (nth es i)]
+    (assoc db
+           :selected-entity e
+           :current-view :entity-view
+           )))
 (defnc overlay-grid []
   (d/div {:class "grid grid-style select-none"
           }
@@ -413,7 +438,7 @@ helix.core/provider
            (d/div {:class "bg-white opacity-0 hover:opacity-20 hover:animate-pulse"
                    &      {:key           [x y]
                            :on-mouse-over #(mouse-over-relative-coord [x y])
-                           :on-click #()}}))))
+                           :on-click #(world-click [x y])}}))))
 (def overlay-grid-element ($ overlay-grid))
 (def initial-db (generate-level db/default-db))
 (defevent toggle-reverse-time #(update % :reverse-time? not))
@@ -432,12 +457,24 @@ helix.core/provider
             (player-movement)
             (enemy-movement)
             (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
-      (scroll 0)
+      ;; (scroll 0)
       ))
 
 (stylefy/class "right-of-sidebar" {:position "fixed"
                                    :height   "100vh"
                                    :left     "30vh"})
+(defnc entity-view [{:keys [c->e->v selected-entity]}]
+  (let [aaa  (update-vals c->e->v #(% selected-entity))
+        name (aaa :name)
+        char (aaa :char)
+        ]
+    (d/div {:class "right-of-sidebar p-7 flex-col flex w-100 space-y-2"}
+           (d/p {:class "text-white p-1 text-5xl"}
+                (str char " " name)
+                )
+           (for [[k v] (filter second (dissoc aaa :name :char))]
+             (d/p {:key k}
+                  (str k " " v))))))
 (defnc inventory-view [{:keys [c->e->v] :as db}]
   (let [player-id  (get-player-id db)
         player-inv (get-in c->e->v [:container player-id])]
@@ -461,7 +498,6 @@ helix.core/provider
             (add-message (str "You crafted " (kw->str 1 id))))
         (add-message db "You don't have the items to craft that")))
     (add-message db "You can't craft that")))
-
 (defnc crafting-view [{:keys [c->e->v] :as db}]
   (let [player-id  (get-player-id db)
         player-inv (get-in c->e->v [:container player-id])]
@@ -496,9 +532,10 @@ helix.core/provider
 (defnc main-view []
   (let [[{:keys [tiles c->e->v reverse-time? current-view] :as db} set-state!] (hooks/use-state initial-db)]
     (defonce aa (reset! setter set-state!))
+    ;; (defonce get-db (fn []))
     ;; (js/console.log (db :mouse-over-relative-coord))
     (d/div {:onMouseUp     #(mouse-up)
-            :on-mouse-move #(mouse-move %1)
+            ;; :on-mouse-move #(mouse-move %1)
             :class         "h-screen w-screen bg-gray-600 font-mono text-red-200 text-lg overflow-hidden"
             }
            (d/div {:class "flex-none"
@@ -507,17 +544,18 @@ helix.core/provider
                            :width    "30vh"}}
                   ($ sidebar {& (select-keys db [:reverse-time? :message-log])}))
            (case current-view
+             :entity-view    ($ entity-view {& (select-keys db [:c->e->v :selected-entity])})
              :world-view     ($ world-view {& (select-keys db [:tiles :scroll-pos :mouse-over-relative-coord :c->e->v])})
              :inventory-view ($ inventory-view {& (select-keys db [:c->e->v])})
              :crafting-view  ($ crafting-view {& (select-keys db [:c->e->v])})
              ;; :stats-view     ($ stats-view (select-keys db [:c->e->v]))
              ;; :abilities-view ($ abilities-view (select-keys db [:c->e->v]))
-             (d/p {:class "right-of-sidebar"} (kw->str current-view))))))
+             (d/p {:class "right-of-sidebar"} (kw->str current-view))
+             ))))
 
 
-
-;; (defevent init #(-> db/default-db
-;;                     generate-level))
+(defevent init #(-> db/default-db
+                    generate-level))
 
 (comment
   (.fillText context "hello world 🤡" 50 90 140)

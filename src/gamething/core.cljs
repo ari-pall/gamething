@@ -9,20 +9,21 @@
   (:require-macros [gamething.macros :refer [defevent]]
                    [helix.core :refer [$]]))
 
-;; (defn ^:dev/after-load mount-root []
-;;   (let [root-el (.getElementById js/document "app")]
-;;     (dumdom.core/unmount root-el)
-;;     ;; (dumdom.core/render (game/view) root-el)
-;;     ))
+(defonce root (rdom/createRoot (js/document.getElementById "app")))
 
-;; (rdom/createRoot)
-;; (js/R)
+
+(defn ^:dev/after-load mount-root []
+  (.render root
+           ($ game/main-view))
+  )
+
 (def inited (atom nil))
 (defn init []
   (when-not @inited
     (reset! inited true)
     (stylefy/init {:dom (stylefy-generic-dom/init)})
-    (.render (rdom/createRoot (js/document.getElementById "app"))
+
+    (.render root
              ($ game/main-view))
     ;; (js/setTimeout #(game/add-message! "hi")  4000)
     ;; (js/setTimeout #(game/add-message! "this is the message log") 7000)
@@ -32,13 +33,9 @@
                                                           1
                                                          -1)))
     (.addEventListener js/window "keyup" #(when-not (.-repeat %)
-                                            (game/key-up (.-key %))
-                                            ;; (js/console.log (str (.-key %) " up"))
-                                            ))
+                                            (game/key-up (.-key %))))
     (.addEventListener js/window "keydown" #(when-not (.-repeat %)
-                                              (game/key-down (.-key %))
-                                              ;; (js/console.log (str (.-key %) " down"))
-                                              ))
+                                              (game/key-down (.-key %))))
     ;; (game/init)
 
     ))

@@ -39,10 +39,9 @@
           }
    :mouse-over-relative-coord nil
    :scroll-pos 0
-   ;; :target-list []
-   ;; :target-list-scroll-pos 0
    :entity-count 0
-   :c->e->v      {:time 0}
+   :c->e->v      {}
+   :selected-entity nil
    :history '()
    :reverse-time? nil
    :tiles nil
