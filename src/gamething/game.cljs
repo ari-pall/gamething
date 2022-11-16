@@ -464,26 +464,28 @@ helix.core/provider
 (def overlay-grid-element ($ overlay-grid))
 (def initial-db (generate-level db/default-db))
 (defevent toggle-reverse-time #(update % :reverse-time? not))
-(defevent tick [{:keys [c->e->v reverse-time? time history] :as db}]
-  (if reverse-time?
-    (if (empty? history)
-      (assoc db :reverse-time? nil)
-      (-> db
-          (assoc :c->e->v (first history))
-          (update :history rest)
-          (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
-    (if (<= (get-in c->e->v [:hp (get-player-id db)]) 0)
-      (-> db
-          (add-message (str "You were killed. Score: " (or (get-in c->e->v [:container (get-player-id db) :loot]) 0)))
-          (assoc :reverse-time? true))
-      (-> db
-          (update :time inc)
-          (update :history conj c->e->v)
-          (update :c->e->v random-movement)
-          (player-movement)
-          (enemy-movement)
-          (attack-player)
-          (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))))
+(defevent tick [{:keys [c->e->v reverse-time? time history current-view] :as db}]
+  (if (= current-view :world-view)
+    (if reverse-time?
+      (if (empty? history)
+        (assoc db :reverse-time? nil)
+        (-> db
+            (assoc :c->e->v (first history))
+            (update :history rest)
+            (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
+      (if (<= (get-in c->e->v [:hp (get-player-id db)]) 0)
+        (-> db
+            (add-message (str "You were killed. Score: " (or (get-in c->e->v [:container (get-player-id db) :loot]) 0)))
+            (assoc :reverse-time? true))
+        (-> db
+            (update :time inc)
+            (update :history conj c->e->v)
+            (update :c->e->v random-movement)
+            (player-movement)
+            (enemy-movement)
+            (attack-player)
+            (assoc :tiles (make-tiles c->e->v (get-player-pos db))))))
+    db))
 
 (stylefy/class "right-of-sidebar" {:position "fixed"
                                    :height   "100vh"
