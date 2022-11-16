@@ -20,10 +20,13 @@
    [helix.hooks :as hooks]
    [helix.dom :as d]
    ["react-dom/client" :as rdom]
+   ["react" :as react]
    )
   (:require-macros [gamething.macros :refer [defevent]]
                    [helix.core :refer [$]]))
 
+;; (vec (keys (js->clj react)))
+"use strict"
 
 ;; (def context (helix.core/create-context nil))
 
@@ -51,6 +54,8 @@
 (comment
 
 
+(get-player-pos (path))
+(path :selected-entity)
 
 
   (let [e 5]
@@ -182,9 +187,11 @@ helix.core/provider
 (def level-radius 60)
 (defn prob [p] (> p (rand)))
 
+
 (defn generate-level [db]
   (-> (reduce (fn [db pos]
-                (cond (prob 0.1)  (create-tile db p/tree pos)
+                (cond (some #(= (abs %) level-radius) pos) (create-tile db p/tree pos)
+                      (prob 0.1)  (create-tile db p/tree pos)
                       (prob 0.03) (create-tile db p/rock pos)
                       (prob 0.01 ) (-> db
                                        (create-tile p/grass pos)
@@ -244,18 +251,18 @@ helix.core/provider
         (assoc-in [:move-dir i] val)
         (assoc-in [:current-dir i] val))
     db))
+(defn get-player-id [{:keys [c->e->v] :as db}] (first (first (get-in c->e->v [:player]))))
+(defn get-player-pos [{:keys [c->e->v] :as db}] (get-in c->e->v [:pos (get-player-id db)]))
+(defn get-entities-on-relative-coord [{:keys [c->e->v] :as db} relative-coord]
+  (let [t (vec+ relative-coord (get-player-pos db))]
+    (conj (keys (get-in c->e->v [:container t])) t)))
 (defn clamp [a b c]
   (min (max a b) c))
 (defn scroll [{:keys [scroll-pos mouse-over-relative-coord] :as db} d]
-  (assoc db :scroll-pos (clamp 0
-                               (+ d scroll-pos)
-                               (dec (count (get-entities-on-relative-coord db mouse-over-relative-coord))))))
+  (let [l (dec (count (get-entities-on-relative-coord db mouse-over-relative-coord)))]
+    (assoc db :scroll-pos (clamp 0 (+ d (clamp 0 scroll-pos l)) l))))
 (defevent scroll! [{keys [scroll-pos mouse-over-relative-coord] :as db} d]
   (scroll db d))
-(defn entities-on-tile [{:keys [c->e->v] :as db} t]
-  (keys (get-in c->e->v [:container t])))
-(defn get-player-id [{:keys [c->e->v] :as db}] (first (first (get-in c->e->v [:player]))))
-(defn get-player-pos [{:keys [c->e->v] :as db}] (get-in c->e->v [:pos (get-player-id db)]))
 (defn container-transfer [c->e->v c1 c2 transaction]
   (assert (not-any? neg? (vals transaction)))
   (reduce (fn [c->e->v [item-id num]]
@@ -305,21 +312,38 @@ helix.core/provider
                 c->e->v))
             c->e->v
             affected)))
-(defn attack-player [{:keys [c->e->v] :as db} enemy]
-  (add-message db (str (get-in c->e->v [:name enemy]) " attacks you")))
 (defn enemy-movement [{:keys [c->e->v] :as db}]
   (let [player-pos (get-player-pos db)
         affected   (keys (c->e->v :enemy-movement))
         pos-es     (component-values c->e->v :pos affected)]
     (assoc db :c->e->v (reduce (fn [c->e->v [e pos]]
-                                 (cond (prob 0.3) (try-to-move c->e->v e (mapv #(cond (<= % -1) -1
+                                 (cond (prob 0.5) (try-to-move c->e->v e (mapv #(cond (<= % -1) -1
                                                                                       (>= % 1)  1
                                                                                       true      0)
                                                                                (vec- player-pos pos)))
-                                       (prob 0.4) (try-to-move c->e->v e (rand-nth [[0 1] [0 -1] [-1 0] [1 0]]))
+                                       (prob 0.8) (try-to-move c->e->v e (rand-nth [[0 1] [0 -1] [-1 0] [1 0]]))
                                        true       c->e->v))
                                c->e->v
                                (map vector affected pos-es)))))
+;; (harm (path :c->e->v) 4)
+(defn harm [c->e->v e]
+  (update-in c->e->v [:hp e] dec))
+(defn adjacent? [pos1 pos2]
+  (every? #(<= -1 % 1) (map - pos1 pos2)))
+;; (adjacent? [1 2] [2 1])
+;; (defn attack-player [{:keys [c->e->v] :as db} enemy]
+;;   (add-message db (str (get-in c->e->v [:name enemy]) " attacks you")))
+(defn attack-player [{:keys [c->e->v] :as db}]
+  (let [player-pos (get-player-pos db)
+        player-id  (get-player-id db)
+        affected   (keys (c->e->v :attack-player))
+        pos-es     (component-values c->e->v :pos affected)]
+    (assoc db :c->e->v (reduce (fn [c->e->v pos]
+                                 (if (adjacent? pos player-pos)
+                                   (harm c->e->v player-id)
+                                   c->e->v))
+                               c->e->v
+                               pos-es))))
 (defn player-movement [{:keys [c->e->v current-dir move-dir] :as db}]
   (let [player-id (get-player-id db)
         pos       (get-player-pos db)]
@@ -390,11 +414,11 @@ helix.core/provider
          (d/div {:class "grid grid-cols-4 auto-rows-fr select-none bg-gray-300 text-3xl text-black"
                  }
                 ($ grid-button {:on-click #(set-current-view :world-view)} "👀")
-                ($ grid-button {:on-click #(set-current-view :abilities-view)} "🪄")
+                ;; ($ grid-button {:on-click #(set-current-view :abilities-view)} "🪄")
                 ($ grid-button {:on-click try-to-spawn-snowman} "⛄")
-                ($ grid-button {:on-click spawn-strange-creature} "🔎")
+                ;; ($ grid-button {:on-click spawn-strange-creature} "🔎")
                 ($ grid-button {:on-click #(set-current-view :inventory-view)} "👜")
-                ($ grid-button {:on-click #(set-current-view :stats-view)} "📜")
+                ;; ($ grid-button {:on-click #(set-current-view :stats-view)} "📜")
                 ($ grid-button {:on-click #(set-current-view :crafting-view)} "🛠")
                 ($ grid-button {:on-click spawn-strange-creature} "👿")
                 ($ grid-button {:on-click toggle-reverse-time} (if reverse-time?
@@ -405,20 +429,18 @@ helix.core/provider
          ($ message-log-view {& {:message-log message-log}}))
   )
 (def x [db dk])
-(defn get-entities-on-relative-coord [{:keys [c->e->v] :as db} relative-coord]
-  (let [t (vec+ relative-coord (get-player-pos db))]
-    ;; (js/console.log (str (conj (keys (get-in c->e->v [:container t])) t)))
-    (conj (keys (get-in c->e->v [:container t])) t)))
 (defnc desc-popup [{:keys [c->e->v mouse-over-relative-coord scroll-pos] :as db}]
   (let [list (get-entities-on-relative-coord db mouse-over-relative-coord)]
     (d/div {:class "flex flex-col bg-gray-600 font-mono text-red-200 text-lg"}
+           (d/p {} (str "score: " (or (get-in c->e->v [:container (get-player-id db) :loot]) 0)))
+           (d/p {} (str "hp: " (or (get-in c->e->v [:hp (get-player-id db)]) 0)))
            (map-indexed (fn [i e]
                           (let [[char name] (entity-components c->e->v e [:char :name])]
                             (d/p {& {:key   i
                                      :class (if (= i (clamp 0 scroll-pos (dec (count list))))
                                               "border-solid border-2"
                                               "")}}
-                                 char " " name)))
+                                 (str char " " name))))
                         list))))
 (defevent mouse-over-relative-coord [{:keys [c->e->v] :as db} coord]
   (assoc db :mouse-over-relative-coord coord))
@@ -443,35 +465,34 @@ helix.core/provider
 (def initial-db (generate-level db/default-db))
 (defevent toggle-reverse-time #(update % :reverse-time? not))
 (defevent tick [{:keys [c->e->v reverse-time? time history] :as db}]
-  (-> (if reverse-time?
-        (if (empty? history)
-          (assoc db :reverse-time? nil)
-          (-> db
-              (assoc :c->e->v (first history))
-              (update :history rest)
-              (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
-        (-> db
-            (update :time inc)
-            (update :history conj c->e->v)
-            (update :c->e->v random-movement)
-            (player-movement)
-            (enemy-movement)
-            (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
-      ;; (scroll 0)
-      ))
+  (if reverse-time?
+    (if (empty? history)
+      (assoc db :reverse-time? nil)
+      (-> db
+          (assoc :c->e->v (first history))
+          (update :history rest)
+          (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
+    (if (<= (get-in c->e->v [:hp (get-player-id db)]) 0)
+      (-> db
+          (add-message (str "You were killed. Score: " (or (get-in c->e->v [:container (get-player-id db) :loot]) 0)))
+          (assoc :reverse-time? true))
+      (-> db
+          (update :time inc)
+          (update :history conj c->e->v)
+          (update :c->e->v random-movement)
+          (player-movement)
+          (enemy-movement)
+          (attack-player)
+          (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))))
 
 (stylefy/class "right-of-sidebar" {:position "fixed"
                                    :height   "100vh"
                                    :left     "30vh"})
 (defnc entity-view [{:keys [c->e->v selected-entity]}]
-  (let [aaa  (update-vals c->e->v #(% selected-entity))
-        name (aaa :name)
-        char (aaa :char)
-        ]
+  (let [{:keys [name char] :as aaa} (update-vals c->e->v #(get % selected-entity))]
     (d/div {:class "right-of-sidebar p-7 flex-col flex w-100 space-y-2"}
            (d/p {:class "text-white p-1 text-5xl"}
-                (str char " " name)
-                )
+                (str char " " name))
            (for [[k v] (filter second (dissoc aaa :name :char))]
              (d/p {:key k}
                   (str k " " v))))))

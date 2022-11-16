@@ -33,10 +33,12 @@
              :name   "player"
              :player true
              :container {}
+             :hp 300
              })
 (def enemy {:char "👿"
             :name "enemy"
             :enemy-movement true
+            :attack-player true
             })
 (def snowman {:name            "snowman"
               :char            "⛄"
