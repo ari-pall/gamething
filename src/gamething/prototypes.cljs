@@ -7,6 +7,16 @@
            :name "wall"
            :char "#"
            })
+(def water {:tile {:type     :wall
+                   :bg-color "#5961FF"
+                   }
+            :name "water"
+            })
+(def sand {:tile {:type     :floor
+                  :bg-color "#D9DC60"
+                  }
+           :name "sand"
+           })
 (def tree {:tile {:type     :wall
                   :bg-color "#27AD00"
                   }
@@ -29,7 +39,7 @@
              :name "ladder"
              :char "🪜"
              :portal :cave})
-(def player {:char   "😀"
+(def player {:char   (rand-nth ["🤓" "🐸" "😠" "🤡" "😳" "😔" "😐" "🤤" "🙃" "🙂" ])
              :name   "player"
              :player true
              :container {}

@@ -159,7 +159,7 @@ helix.core/provider
 ;; (defsub home [] [_ [(none)]]
 ;;   [:div.m-6.space-x-2.text-3xl
 ;;    [:p.text-yellow-400.m-3 "Choose your emoji"]
-;;    (for [e ["🤓" "🐸" "😠" "🤡" "😳" "😔" "😐" "🤤" "🙃" "🙂" ]]
+   ;; (for [e ["🤓" "🐸" "😠" "🤡" "😳" "😔" "😐" "🤤" "🙃" "🙂" ]]
 ;;      ^{:key e} [:button.link {:on-click #(set-emoji e)}
 ;;                 e])])
 ;; (defsub garden [] [_ [(none)]]
@@ -184,13 +184,15 @@ helix.core/provider
                                  %
                                  (assoc tile-prototype :container {})))))
 (def view-radius 12)
-(def level-radius 60)
+(def level-radius 70)
 (defn prob [p] (> p (rand)))
 
-
+(defn dist [v1 v2]
+  (js/Math.sqrt (reduce + (map #(* % %) (map - v1 v2)))))
 (defn generate-level [db]
   (-> (reduce (fn [db pos]
-                (cond (some #(= (abs %) level-radius) pos) (create-tile db p/tree pos)
+                (cond (>= (dist pos [0 0]) (- level-radius view-radius)) (create-tile db p/water pos)
+                      (>= (dist pos [0 0]) (- level-radius view-radius 3)) (create-tile db p/sand pos)
                       (prob 0.1)  (create-tile db p/tree pos)
                       (prob 0.03) (create-tile db p/rock pos)
                       (prob 0.01 ) (-> db
@@ -383,8 +385,8 @@ helix.core/provider
 (defevent spawn-strange-creature [db] (-> db
                                           (add-message "you spawned a strange creature")
                                           (create-entity {:random-movement true
-                                                             :name            "strange creature"
-                                                             :char            (rand-nth ["🦵" "🤖" "🦋" "👁" "🐦" "🦈"])}
+                                                          :name            "strange creature"
+                                                          :char            (rand-nth ["🦵" "🤖" "🦋" "👁" "🐦" "🦈"])}
                                                          (get-player-pos db))))
 
 (defnc message-log-view [{:keys [message-log]}]
@@ -406,7 +408,7 @@ helix.core/provider
       (-> db
           (update-in [:c->e->v :container player-id] do-transaction {:snowman -1})
           (create-entity p/snowman pos))
-      (add-message db "you dont have a snowman"))))
+      (add-message db "you don't have a snowman"))))
 ;; (symbol (str "aaa" "!"))
 (defnc sidebar [{:keys [reverse-time? message-log] :as props}]
   (d/div {:class "flex flex-col"}
