@@ -22,7 +22,7 @@
    ["react-dom/client" :as rdom]
    ["react" :as react]
    )
-  (:require-macros [gamething.macros :refer [defevent]]
+  (:require-macros [gamething.macros :refer [defevent event]]
                    [helix.core :refer [$]]))
 
 ;; (vec (keys (js->clj react)))
@@ -40,14 +40,28 @@
 
 
 (def gotten (atom nil))
-(defevent getter [db]
-  (do (reset! gotten db)
+(defevent getter [db path]
+  (do (reset! gotten (get-in db path))
       db))
 (defn path [& args]
-  (getter)
-  (get-in @gotten args)
-  )
+  (getter args)
+  @gotten)
 (def setter (atom nil))
+
+
+(comment
+  (defn f [db k] (assoc db k k))
+  (f {} 3)
+  (event f)
+  (f! 3)
+  (path 3)
+  f!
+  (event f)
+  defe
+  ev
+  defevent
+ (path :message-log)
+ )
 
 
 
@@ -263,8 +277,9 @@ helix.core/provider
 (defn scroll [{:keys [scroll-pos mouse-over-relative-coord] :as db} d]
   (let [l (dec (count (get-entities-on-relative-coord db mouse-over-relative-coord)))]
     (assoc db :scroll-pos (clamp 0 (+ d (clamp 0 scroll-pos l)) l))))
-(defevent scroll! [{keys [scroll-pos mouse-over-relative-coord] :as db} d]
-  (scroll db d))
+;; (defevent scroll! [{keys [scroll-pos mouse-over-relative-coord] :as db} d]
+;;   (scroll db d))
+(event scroll)
 (defn container-transfer [c->e->v c1 c2 transaction]
   (assert (not-any? neg? (vals transaction)))
   (reduce (fn [c->e->v [item-id num]]
@@ -388,13 +403,11 @@ helix.core/provider
                                                           :name            "strange creature"
                                                           :char            (rand-nth ["🦵" "🤖" "🦋" "👁" "🐦" "🦈"])}
                                                          (get-player-pos db))))
-
 (defnc message-log-view [{:keys [message-log]}]
   (d/div {:class "flex flex-col-reverse bg-stone-700 text-yellow-200 text-sm overflow-auto h-full"}
          (map-indexed (fn [i message]
-                        (d/p {& {:key i}} message)
-                        )
-                message-log)))
+                        (d/p {& {:key i}} message))
+                      message-log)))
 (defnc grid-button [{:keys [on-click children]}]
   (d/button {:class "hover:text-4xl h-14 focus:outline-none hover:bg-green-300"
              &      {:on-click on-click}}
@@ -483,9 +496,9 @@ helix.core/provider
             (update :time inc)
             (update :history conj c->e->v)
             (update :c->e->v random-movement)
-            (player-movement)
-            (enemy-movement)
-            (attack-player)
+            player-movement
+            enemy-movement
+            attack-player
             (assoc :tiles (make-tiles c->e->v (get-player-pos db))))))
     db))
 
@@ -539,8 +552,7 @@ helix.core/provider
 (defnc world-view [{:keys [tiles] :as db}]
   ;; (js/console.log (db :mouse-over-relative-coord))
   (<>
-    (d/div {:class "grid grid-style text-3xl select-none"
-            }
+    (d/div {:class "grid grid-style text-3xl select-none"}
            (for [[t bg-color char] tiles]
              (d/div {:class "overflow-hidden"
                      &      {:key   t
@@ -552,7 +564,16 @@ helix.core/provider
                     :height   "100vh"
                     }}
            ($ desc-popup {& (select-keys db [:c->e->v :mouse-over-relative-coord :scroll-pos])}))))
-
+4
+(comment
+  partial
+ (defn f [a b]
+   [a b])
+  (event f)
+  (. f)
+ (repeat)
+ (rest (take 5 (iterate #(gensym) nil)))
+ )
 ;; context...
 (defnc main-view []
   (let [[{:keys [tiles c->e->v reverse-time? current-view] :as db} set-state!] (hooks/use-state initial-db)]

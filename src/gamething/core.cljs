@@ -11,6 +11,11 @@
 
 (defonce root (rdom/createRoot (js/document.getElementById "app")))
 
+;; (.valueOf root)
+;; root/valueOf
+;; rdom
+;; (.valueOf rdom)
+;; rdom/valueOf
 
 (defn ^:dev/after-load mount-root []
   (.render root
@@ -31,7 +36,7 @@
     (js/setInterval game/tick 75)
     (.addEventListener js/window "wheel" #(game/scroll! (if (< (.-wheelDeltaY %) 0)
                                                           1
-                                                         -1)))
+                                                          -1)))
     (.addEventListener js/window "keyup" #(when-not (.-repeat %)
                                             (game/key-up (.-key %))))
     (.addEventListener js/window "keydown" #(when-not (.-repeat %)
