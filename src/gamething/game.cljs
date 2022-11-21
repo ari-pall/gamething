@@ -12,7 +12,7 @@
    ;; [promesa.core :as promesa]
    ;; [minicosm.core :refer [start!]]
    ;; [minicosm.ddn :refer [render-to-canvas]]
-   [goog.async.nextTick]
+   ;; [goog.async.nextTick]
    ;; [cljs.core.async :refer [chan alts! put! go <! >! timeout close!]]
    [stylefy.core :as stylefy :refer [use-style]]
    [stylefy.generic-dom :as stylefy-generic-dom]
@@ -359,6 +359,7 @@ helix.core/provider
 (def grid-range (range (- view-radius) (inc view-radius)))
 (def reverse-grid-range (reverse grid-range))
 (defn make-tiles [c->e->v [posx posy]]
+  ;; ($ world-grid {& {:tiles ....}})
   (for [y reverse-grid-range
         x grid-range
         ]
@@ -529,6 +530,7 @@ helix.core/provider
                           & {:key id
                              :on-click #(! try-to-craft id)}}
                          (kw->str num id)))))))
+;; helix.core/memo
 ;; .........
 (defnc world-grid [{:keys [tiles]}]
   (d/div {:class "grid grid-style text-3xl select-none"}
