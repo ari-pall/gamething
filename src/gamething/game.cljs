@@ -9,21 +9,22 @@
    [gamething.prototypes :as p]
    ;; [schema.core :as s :include-macros true]
    ;; [stylo.core :refer [c]]
-   [promesa.core :as promesa]
+   ;; [promesa.core :as promesa]
    ;; [minicosm.core :refer [start!]]
    ;; [minicosm.ddn :refer [render-to-canvas]]
    [goog.async.nextTick]
-   [cljs.core.async :refer [chan alts! put! go <! >! timeout close!]]
+   ;; [cljs.core.async :refer [chan alts! put! go <! >! timeout close!]]
    [stylefy.core :as stylefy :refer [use-style]]
    [stylefy.generic-dom :as stylefy-generic-dom]
-   [helix.core :refer [defnc <>]]
+   [helix.core :refer [defnc <> $]]
    [helix.hooks :as hooks]
    [helix.dom :as d]
    ["react-dom/client" :as rdom]
    ["react" :as react]
    )
-  (:require-macros [gamething.macros :refer [defevent event]]
-                   [helix.core :refer [$]]))
+  (:require-macros [gamething.macros :refer []]
+                   [helix.core :refer [;; $
+                                       ]]))
 
 ;; (vec (keys (js->clj react)))
 "use strict"
@@ -39,36 +40,23 @@
 ;;                         {:opacity 1}])
 
 
-(def gotten (atom nil))
-(defevent getter [db path]
-  (do (reset! gotten (get-in db path))
-      db))
-(defn path [& args]
-  (getter args)
-  @gotten)
+
+;; (! #(assoc % 6 6))
+;; (path 6)
+
 (def setter (atom nil))
+(defn ! [f & args]
+  (@gamething.game/setter (fn [db] (apply f db args))))
+(def gotten (atom nil))
+(defn path [& args]
+  (! #(do (reset! gotten (get-in % args))
+          %))
+  @gotten)
 
 
 (comment
-  (defn f [db k] (assoc db k k))
-  (f {} 3)
-  (event f)
-  (f! 3)
-  (path 3)
-  f!
-  (event f)
-  defe
-  ev
-  defevent
  (path :message-log)
- )
-
-
-
-(comment
-
-
-(get-player-pos (path))
+;; (get-player-pos (path))
 (path :selected-entity)
 
 
@@ -105,7 +93,6 @@ helix.core/provider
               (str n " " name "s")))))
 (defn add-message [db message]
   (update db :message-log conj message))
-(defevent add-message! [db message] (add-message db message))
 (def crafting-recipes {:snowball       {}
                        :large-snowball {:snowball 3}
                        :snowman        {:snowball 1 :large-snowball 2 :stick 2}
@@ -113,7 +100,7 @@ helix.core/provider
                        :thing-maker {:conveyor-belt 1 :metal-gear 1 :electric-motor 1}
                        })
 (def store-prices {:conveyor-belt 3 :metal-gear 2 :electric-motor 6 :factory 30 :crate 2 :flower-seed 2})
-(defevent try-to-buy [db id]
+(defn try-to-buy [db id]
   (let [t {:money (- (store-prices id)) id 1}]
     (if (valid-transaction? (db :inventory) t)
       (let [db (-> db
@@ -131,14 +118,13 @@ helix.core/provider
 ;;                  {:on-click  #(try-to-buy id)}
 ;;                  (str (kw->str 1 id) " for " price " moneys")])])
 ;; (defsub all str)
-(defevent mouse-down-on-card [db k arg]
+(defn mouse-down-on-card [db k arg]
   (-> db
       (assoc-in [:drag :held-card] k)
       (assoc-in [:drag :held-card-relative-pos] (vec- (get-in db [:cards k :pos])
                                                       [(.-clientX arg) (.-clientY arg)]))))
-(defevent mouse-up [db] (assoc-in db [:drag :held-card] nil))
-;; (reg-event-db :mouse-up (fn [db _] (assoc-in db [:drag :held-card] nil)))
-(defevent mouse-move [db arg]
+(defn mouse-up [db] (assoc-in db [:drag :held-card] nil))
+(defn mouse-move [db arg]
   (if-let [k (get-in db [:drag :held-card])]
     (assoc-in db [:cards k :pos] (vec+ (get-in db [:drag :held-card-relative-pos])
                                        [(.-clientX arg) (.-clientY arg)]))
@@ -165,7 +151,7 @@ helix.core/provider
 ;;                   {:onMouseDown #(dispatch [:do (fn [db] (assoc-in % [:factory :held-object] id))])}
 ;;                   text])]
 ;;    ])
-(defevent set-emoji [db e]
+(defn set-emoji [db e]
   (-> db
       (assoc :player-emoji e)
       ;; (assoc-in [:cave :player-emoji] e)
@@ -238,7 +224,7 @@ helix.core/provider
       ;; (assoc :entity-count 0)
       (create-tile p/grass [0 0])
       (create-entity p/player [0 0])))
-(defevent key-up [db key]
+(defn key-up [db key]
   (if-let [i (case key
                "a"          0
                "ArrowLeft"  0
@@ -251,7 +237,7 @@ helix.core/provider
                nil)]
     (assoc-in db [:current-dir i] 0)
     db))
-(defevent key-down [db key]
+(defn key-down [db key]
   (if-let [[i val]
            (case key
              "a"          [0 -1]
@@ -268,7 +254,8 @@ helix.core/provider
         (assoc-in [:current-dir i] val))
     db))
 (defn get-player-id [{:keys [c->e->v] :as db}] (first (first (get-in c->e->v [:player]))))
-(defn get-player-pos [{:keys [c->e->v] :as db}] (get-in c->e->v [:pos (get-player-id db)]))
+(defn get-player-component [{:keys [c->e->v] :as db} component] (get-in c->e->v [component (get-player-id db)]))
+(defn get-player-pos [{:keys [c->e->v] :as db}] (get-player-component db :pos))
 (defn get-entities-on-relative-coord [{:keys [c->e->v] :as db} relative-coord]
   (let [t (vec+ relative-coord (get-player-pos db))]
     (conj (keys (get-in c->e->v [:container t])) t)))
@@ -277,9 +264,6 @@ helix.core/provider
 (defn scroll [{:keys [scroll-pos mouse-over-relative-coord] :as db} d]
   (let [l (dec (count (get-entities-on-relative-coord db mouse-over-relative-coord)))]
     (assoc db :scroll-pos (clamp 0 (+ d (clamp 0 scroll-pos l)) l))))
-;; (defevent scroll! [{keys [scroll-pos mouse-over-relative-coord] :as db} d]
-;;   (scroll db d))
-(event scroll)
 (defn container-transfer [c->e->v c1 c2 transaction]
   (assert (not-any? neg? (vals transaction)))
   (reduce (fn [c->e->v [item-id num]]
@@ -397,12 +381,12 @@ helix.core/provider
                                   :width                 "100vh"
                                   :height                "100vh"
                                   })
-(defevent spawn-strange-creature [db] (-> db
-                                          (add-message "you spawned a strange creature")
-                                          (create-entity {:random-movement true
-                                                          :name            "strange creature"
-                                                          :char            (rand-nth ["🦵" "🤖" "🦋" "👁" "🐦" "🦈"])}
-                                                         (get-player-pos db))))
+(defn spawn-strange-creature [db] (-> db
+                                      (add-message "you spawned a strange creature")
+                                      (create-entity {:random-movement true
+                                                      :name            "strange creature"
+                                                      :char            (rand-nth ["🦵" "🤖" "🦋" "👁" "🐦" "🦈"])}
+                                                     (get-player-pos db))))
 (defnc message-log-view [{:keys [message-log]}]
   (d/div {:class "flex flex-col-reverse bg-stone-700 text-yellow-200 text-sm overflow-auto h-full"}
          (map-indexed (fn [i message]
@@ -412,9 +396,10 @@ helix.core/provider
   (d/button {:class "hover:text-4xl h-14 focus:outline-none hover:bg-green-300"
              &      {:on-click on-click}}
             children))
-(defevent set-current-view [db view]
+(defn set-current-view [db view]
   (assoc db :current-view view))
-(defevent try-to-spawn-snowman [{:keys [c->e->v] :as db}]
+(def toggle-reverse-time #(update % :reverse-time? not))
+(defn try-to-spawn-snowman [{:keys [c->e->v] :as db}]
   (let [player-id (get-player-id db)
         [inv pos] (entity-components c->e->v player-id [:container :pos])]
     (if (valid-transaction? inv {:snowman -1})
@@ -422,28 +407,25 @@ helix.core/provider
           (update-in [:c->e->v :container player-id] do-transaction {:snowman -1})
           (create-entity p/snowman pos))
       (add-message db "you don't have a snowman"))))
-;; (symbol (str "aaa" "!"))
-(defnc sidebar [{:keys [reverse-time? message-log] :as props}]
+(defnc sidebar [{:keys [reverse-time? message-log]}]
   (d/div {:class "flex flex-col"}
          ;; (d/p {:class "border-2 border-solid"} "aaaaa")
          (d/div {:class "grid grid-cols-4 auto-rows-fr select-none bg-gray-300 text-3xl text-black"
                  }
-                ($ grid-button {:on-click #(set-current-view :world-view)} "👀")
+                ($ grid-button {:on-click #(! set-current-view :world-view)} "👀")
                 ;; ($ grid-button {:on-click #(set-current-view :abilities-view)} "🪄")
-                ($ grid-button {:on-click try-to-spawn-snowman} "⛄")
+                ($ grid-button {:on-click #(! try-to-spawn-snowman)} "⛄")
                 ;; ($ grid-button {:on-click spawn-strange-creature} "🔎")
-                ($ grid-button {:on-click #(set-current-view :inventory-view)} "👜")
+                ($ grid-button {:on-click #(! set-current-view :inventory-view)} "👜")
                 ;; ($ grid-button {:on-click #(set-current-view :stats-view)} "📜")
-                ($ grid-button {:on-click #(set-current-view :crafting-view)} "🛠")
-                ($ grid-button {:on-click spawn-strange-creature} "👿")
-                ($ grid-button {:on-click toggle-reverse-time} (if reverse-time?
-                                                                 "←⌛"
-                                                                 "⌛→"))
+                ($ grid-button {:on-click #(! set-current-view :crafting-view)} "🛠")
+                ($ grid-button {:on-click #(! spawn-strange-creature)} "👿")
+                ($ grid-button {:on-click #(! toggle-reverse-time)} (if reverse-time?
+                                                                      "←⌛"
+                                                                      "⌛→"))
                 )
-
-         ($ message-log-view {& {:message-log message-log}}))
-  )
-(def x [db dk])
+         ($ message-log-view {& {:message-log message-log}})))
+(def x aaaaaaaaaaaa)
 (defnc desc-popup [{:keys [c->e->v mouse-over-relative-coord scroll-pos] :as db}]
   (let [list (get-entities-on-relative-coord db mouse-over-relative-coord)]
     (d/div {:class "flex flex-col bg-gray-600 font-mono text-red-200 text-lg"}
@@ -457,9 +439,9 @@ helix.core/provider
                                               "")}}
                                  (str char " " name))))
                         list))))
-(defevent mouse-over-relative-coord [{:keys [c->e->v] :as db} coord]
+(defn mouse-over-relative-coord [{:keys [c->e->v] :as db} coord]
   (assoc db :mouse-over-relative-coord coord))
-(defevent world-click [{:keys [scroll-pos] :as db} relative-coord]
+(defn world-click [{:keys [scroll-pos] :as db} relative-coord]
   (let [es (get-entities-on-relative-coord db relative-coord)
         i  (clamp 0 scroll-pos (dec (count es)))
         e  (nth es i)]
@@ -468,18 +450,16 @@ helix.core/provider
            :current-view :entity-view
            )))
 (defnc overlay-grid []
-  (d/div {:class "grid grid-style select-none"
-          }
+  (d/div {:class "grid grid-style select-none"}
          (for [y reverse-grid-range
                x grid-range]
            (d/div {:class "bg-white opacity-0 hover:opacity-20 hover:animate-pulse"
                    &      {:key           [x y]
-                           :on-mouse-over #(mouse-over-relative-coord [x y])
-                           :on-click #(world-click [x y])}}))))
+                           :on-mouse-over #(! mouse-over-relative-coord [x y])
+                           :on-click #(! world-click [x y])}}))))
 (def overlay-grid-element ($ overlay-grid))
 (def initial-db (generate-level db/default-db))
-(defevent toggle-reverse-time #(update % :reverse-time? not))
-(defevent tick [{:keys [c->e->v reverse-time? time history current-view] :as db}]
+(defn tick [{:keys [c->e->v reverse-time? history current-view] :as db}]
   (if (= current-view :world-view)
     (if reverse-time?
       (if (empty? history)
@@ -523,7 +503,7 @@ helix.core/provider
            (for [[id num] player-inv]
              (d/p {:key id}
                   (kw->str num id))))))
-(defevent try-to-craft [{:keys [c->e->v] :as db} id]
+(defn try-to-craft [{:keys [c->e->v] :as db} id]
   (if-let [recipe (crafting-recipes id)]
     (let [t (update (zipmap (keys recipe)
                             (map - (vals recipe))) id inc)
@@ -547,40 +527,30 @@ helix.core/provider
              (let [num (or (get player-inv id) 0)]
                (d/button {:class "rounded-full bg-gray-300 hover:bg-green-300 py-1"
                           & {:key id
-                             :on-click #(try-to-craft id)}}
+                             :on-click #(! try-to-craft id)}}
                          (kw->str num id)))))))
+;; .........
+(defnc world-grid [{:keys [tiles]}]
+  (d/div {:class "grid grid-style text-3xl select-none"}
+         (for [[t bg-color char] tiles]
+           (d/div {:class "overflow-hidden"
+                   &      {:key   t
+                           :style {:background-color bg-color}}}
+                  char))))
 (defnc world-view [{:keys [tiles] :as db}]
-  ;; (js/console.log (db :mouse-over-relative-coord))
   (<>
-    (d/div {:class "grid grid-style text-3xl select-none"}
-           (for [[t bg-color char] tiles]
-             (d/div {:class "overflow-hidden"
-                     &      {:key   t
-                             :style {:background-color bg-color}}}
-                    char)))
+    ($ world-grid {& {:tiles tiles}})
     overlay-grid-element
     (d/div {:style {:position "fixed"
                     :left     "130vh"
                     :height   "100vh"
                     }}
            ($ desc-popup {& (select-keys db [:c->e->v :mouse-over-relative-coord :scroll-pos])}))))
-4
-(comment
-  partial
- (defn f [a b]
-   [a b])
-  (event f)
-  (. f)
- (repeat)
- (rest (take 5 (iterate #(gensym) nil)))
- )
 ;; context...
 (defnc main-view []
-  (let [[{:keys [tiles c->e->v reverse-time? current-view] :as db} set-state!] (hooks/use-state initial-db)]
+  (let [[{:keys [tiles c->e->v current-view] :as db} set-state!] (hooks/use-state initial-db)]
     (defonce aa (reset! setter set-state!))
-    ;; (defonce get-db (fn []))
-    ;; (js/console.log (db :mouse-over-relative-coord))
-    (d/div {:onMouseUp     #(mouse-up)
+    (d/div {:onMouseUp     #(! mouse-up)
             ;; :on-mouse-move #(mouse-move %1)
             :class         "h-screen w-screen bg-gray-600 font-mono text-red-200 text-lg overflow-hidden"
             }
@@ -600,11 +570,11 @@ helix.core/provider
              ))))
 
 
-(defevent init #(-> db/default-db
-                    generate-level))
+(def init #(-> db/default-db
+               generate-level))
 
 (comment
-  (.fillText context "hello world 🤡" 50 90 140)
+  ;; (.fillText context "hello world 🤡" 50 90 140)
   dorun
   dorun
   for

@@ -5,6 +5,7 @@
    [gamething.game :as game]
    ["react-dom/client" :as rdom]
    [helix.core :refer [defnc]]
+   [goog.dom :as gdom]
    )
   (:require-macros [gamething.macros :refer [defevent]]
                    [helix.core :refer [$]]))
@@ -22,6 +23,8 @@
            ($ game/main-view))
   )
 
+;; (.unmount root)
+;; (. root)
 (def inited (atom nil))
 (defn init []
   (when-not @inited
@@ -33,15 +36,14 @@
     ;; (js/setTimeout #(game/add-message! "hi")  4000)
     ;; (js/setTimeout #(game/add-message! "this is the message log") 7000)
     ;; (js/setTimeout #(game/add-message! "it tells you what's happening") 10000)
-    (js/setInterval game/tick 75)
-    (.addEventListener js/window "wheel" #(game/scroll! (if (< (.-wheelDeltaY %) 0)
-                                                          1
-                                                          -1)))
+    (js/setInterval #(game/! game/tick) 75)
+    (.addEventListener js/window "wheel" #(game/! game/scroll (if (< (.-wheelDeltaY %) 0)
+                                                                1
+                                                                -1)))
     (.addEventListener js/window "keyup" #(when-not (.-repeat %)
-                                            (game/key-up (.-key %))))
+                                            (game/! game/key-up (.-key %))))
     (.addEventListener js/window "keydown" #(when-not (.-repeat %)
-                                              (game/key-down (.-key %))))
-    ;; (game/init)
+                                              (game/! game/key-down (.-key %))))
 
     ))
 
