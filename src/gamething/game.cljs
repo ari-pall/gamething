@@ -77,7 +77,7 @@
                                  %
                                  (assoc tile-prototype :container {})))))
 (def view-radius 12)
-(def level-radius 70)
+(def level-radius 100)
 (defn prob [p] (> p (rand)))
 
 (defn dist [v1 v2]
@@ -253,21 +253,6 @@
 (def black-tile [:p.aspect-square {:style {:background-color "#000000"}} " "])
 (def grid-range (range (- view-radius) (inc view-radius)))
 (def reverse-grid-range (reverse grid-range))
-(defn make-tiles [c->e->v [posx posy]]
-  ;; ($ world-grid {& {:tiles ....}})
-  (for [y reverse-grid-range
-        x grid-range
-        ]
-    ;; (if visible?
-    ;;   ...
-    ;;   black-tile
-    ;;   )
-    (let [t                  [(+ x posx) (+ y posy)]
-          {:keys [bg-color]} (get-in c->e->v [:tile t])
-          ;; es                 (conj (keys (get-in c->e->v [:container t])) t)
-          ;; chars              (component-values c->e->v :char es)
-          ]
-      [t bg-color (get-in c->e->v [:char (last (conj (keys (get-in c->e->v [:container t])) t))])])))
 ;; (stylefy/class "background-transition"
 ;;                {:transition "background-color 1s"})
 (defn spawn-strange-creature [db]
@@ -308,7 +293,7 @@
             (assoc :c->e->v (first history))
             (update :time dec)
             (update :history rest)
-            (assoc :tiles (make-tiles c->e->v (get-player-pos db)))))
+            ))
       (if (<= (get-in c->e->v [:hp (get-player-id db)]) 0)
         (-> db
             (add-message (str "You were killed. Score: " (or (get-in c->e->v [:container (get-player-id db) :loot]) 0)))
@@ -320,7 +305,7 @@
             player-movement
             enemy-movement
             attack-player
-            (assoc :tiles (make-tiles c->e->v (get-player-pos db))))))
+            )))
     db))
 
 (defn try-to-craft [{:keys [c->e->v] :as db} id]

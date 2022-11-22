@@ -28,7 +28,8 @@
     (stylefy/init {:dom (stylefy-generic-dom/init)})
     (.render root
              ($ ui/main-view))
-    (js/setInterval #(ui/! game/tick) 75)
+    (js/setInterval #(ui/! game/tick) 30 ;; 75
+                    )
     (.addEventListener js/window "wheel"
                        #(ui/! game/scroll (if (< (.-wheelDeltaY %) 0)
                                             1
