@@ -143,31 +143,29 @@
 
 (def last-world-grid (atom nil))
 (def last-time (atom nil))
-(defnc world-grid [{:keys [time c->e->v] :as db}]
-  (if (= time @last-time)
-    @last-world-grid
-    (let [[posx posy]
-           (get-player-pos db)
-          grid
-           (d/div
-             {:class "grid grid-style text-3xl select-none"}
-             (for [y reverse-grid-range
-                   x grid-range]
-               (let [t                  [(+ x posx) (+ y posy)]
-                     {:keys [bg-color]} (get-in c->e->v [:tile t])
-                     es                 (conj (keys (get-in c->e->v [:container t])) t)
-                     char               (get-in c->e->v [:char (last es)])
-                     ]
-                 (d/div {:class "overflow-hidden"
-                         &      {:key   t
-                                 :style {:background-color bg-color}}}
-                        char))))]
-      (reset! last-time time)
-      (reset! last-world-grid grid)
-      grid)))
+(defnc world-grid [{:keys [c->e->v] :as db}]
+  (let [[posx posy] (get-player-pos db)]
+    (d/div
+      {:class "grid grid-style text-3xl select-none"}
+      (for [y reverse-grid-range
+            x grid-range]
+        (let [t                  [(+ x posx) (+ y posy)]
+              {:keys [bg-color]} (get-in c->e->v [:tile t])
+              es                 (conj (keys (get-in c->e->v [:container t])) t)
+              char               (get-in c->e->v [:char (last es)])
+              ]
+          (d/div {:class "overflow-hidden"
+                  &      {:key   t
+                          :style {:background-color bg-color}}}
+                 char))))))
 (defnc world-view [{:keys [time] :as db}]
   (<>
-    ($ world-grid {& (select-keys db [:time :c->e->v])})
+    (if (= time @last-time)
+      @last-world-grid
+      (let [grid ($ world-grid {& (select-keys db [:c->e->v])})]
+        (reset! last-time time)
+        (reset! last-world-grid grid)
+        grid))
     overlay-grid-element
     (d/div {:style {:position "fixed"
                     :left     "130vh"
