@@ -147,6 +147,11 @@
 
 (def last-world-grid (atom nil))
 (def last-time (atom nil))
+(defnc world-grid-cell [{:keys [key bg-color char]}]
+  (d/div {:class "overflow-hidden"
+          &      {:key   key
+                  :style {:background-color bg-color}}}
+         char))
 (defnc world-grid [{:keys [c->e->v time] :as db}]
   ;; (js/console.log "bb")
   (if (= time @last-time)
@@ -163,29 +168,46 @@
                                 es                 (conj (keys (get-in c->e->v [:container t])) t)
                                 char               (get-in c->e->v [:char (last es)])
                                 ]
-                            (d/div {:class "overflow-hidden"
-                                    &      {:key   t
-                                            :style {:background-color bg-color}}}
-                                   char))))]
+                            ($ world-grid-cell {& {:key t
+                                                   :bg-color bg-color
+                                                   :char char}})
+                            ;; (d/div {:class "overflow-hidden"
+                            ;;         &      {:key   t
+                            ;;                 :style {:background-color bg-color}}}
+                            ;;        char)
+                            )))]
       (reset! last-time time)
       (reset! last-world-grid grid)
       grid)))
 ;; use-memo
 ;; use-callback
+;; hooks/use-callback
 (defnc world-view [{:keys [time] :as db}]
-  (d/div {}
-    (list
-      (d/div {& {:key time}}
-             ;; (js/console.log "aa")
-             (hooks/use-memo [time] (do ;; (js/console.log "aaaa")
-                                     ($ world-grid {& (select-keys db [:c->e->v :time])}))))
-      (d/div {:key :overlay-grid} overlay-grid-element)
-      (d/div {:key :desc-popup
-              :style {:position "fixed"
-                      :left     "130vh"
-                      :height   "100vh"
-                      }}
-             ($ desc-popup {& (select-keys db [:c->e->v :mouse-over-relative-coord :scroll-pos])}))))
+  (<>
+    ($ world-grid {& (select-keys db [:c->e->v :time])})
+    overlay-grid-element
+    (d/div {:style {:position "fixed"
+                    :left     "130vh"
+                    :height   "100vh"
+                    }}
+           ($ desc-popup {& (select-keys db [:c->e->v :mouse-over-relative-coord :scroll-pos])})))
+  ;; (d/div {}
+  ;;   (list
+  ;;     (d/div {& {:key time}}
+  ;;            ;; (js/console.log "aa")
+  ;;            (if (= time @last-time)
+  ;;              @last-world-grid
+  ;;              ($ world-grid {& (select-keys db [:c->e->v :time])}))
+  ;;            ;; (hooks/use-memo [time] (do ;; (js/console.log "aaaa")
+  ;;            ;;                         ))
+  ;;            )
+  ;;     (d/div {:key :overlay-grid} overlay-grid-element)
+  ;;     (d/div {:key :desc-popup
+  ;;             :style {:position "fixed"
+  ;;                     :left     "130vh"
+  ;;                     :height   "100vh"
+  ;;                     }}
+  ;;            ($ desc-popup {& (select-keys db [:c->e->v :mouse-over-relative-coord :scroll-pos])}))))
   )
 ;; context...
 (defnc main-view []
