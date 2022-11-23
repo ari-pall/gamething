@@ -177,7 +177,8 @@
     (list
       (d/div {& {:key time}}
              ;; (js/console.log "aa")
-             ($ world-grid {& (select-keys db [:c->e->v :time])}))
+             (hooks/use-memo [time] (do ;; (js/console.log "aaaa")
+                                     ($ world-grid {& (select-keys db [:c->e->v :time])}))))
       (d/div {:key :overlay-grid} overlay-grid-element)
       (d/div {:key :desc-popup
               :style {:position "fixed"
