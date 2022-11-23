@@ -147,44 +147,44 @@
 
 (def last-world-grid (atom nil))
 (def last-time (atom nil))
-(defnc world-grid-cell [{:keys [key bg-color char]}]
+(defnc world-grid-cell [{:keys [bg-color char]}]
   (d/div {:class "overflow-hidden"
-          &      {:key   key
-                  :style {:background-color bg-color}}}
+          &      {:style {:background-color bg-color}}}
          char))
-(defnc world-grid [{:keys [c->e->v time] :as db}]
+(defnc world-grid [{:keys [c->e->v] :as db}]
   ;; (js/console.log "bb")
-  (if (= time @last-time)
-    @last-world-grid
-    (let [[posx posy] (get-player-pos db)
-          grid        (d/div
-                        {:class "grid grid-style text-3xl select-none"
-                         }
-                        ;; (js/console.log "cc")
-                        (for [y reverse-grid-range
-                              x grid-range]
-                          (let [t                  [(+ x posx) (+ y posy)]
-                                {:keys [bg-color]} (get-in c->e->v [:tile t])
-                                es                 (conj (keys (get-in c->e->v [:container t])) t)
-                                char               (get-in c->e->v [:char (last es)])
-                                ]
-                            ($ world-grid-cell {& {:key t
-                                                   :bg-color bg-color
-                                                   :char char}})
-                            ;; (d/div {:class "overflow-hidden"
-                            ;;         &      {:key   t
-                            ;;                 :style {:background-color bg-color}}}
-                            ;;        char)
-                            )))]
-      (reset! last-time time)
-      (reset! last-world-grid grid)
-      grid)))
+  (d/div
+    {:class "grid grid-style text-3xl select-none"
+     }
+    ;; (js/console.log "cc")
+    (let [[posx posy] (get-player-pos db)]
+      (for [y reverse-grid-range
+            x grid-range]
+        (let [t                  [(+ x posx) (+ y posy)]
+              {:keys [bg-color]} (get-in c->e->v [:tile t])
+              es                 (conj (keys (get-in c->e->v [:container t])) t)
+              char               (get-in c->e->v [:char (last es)])
+              ]
+          ($ world-grid-cell {& {:key t
+                                 :bg-color bg-color
+                                 :char     char}})))))
+  ;; (hooks/use-memo
+  ;;   [time]
+  ;;   )
+  ;; (if (= time @last-time)
+  ;;   @last-world-grid
+  ;; (let [[posx posy] (get-player-pos db)
+  ;;       grid        ]
+  ;;     (reset! last-time time)
+  ;;     (reset! last-world-grid grid)
+  ;;     grid))
+  )
 ;; use-memo
 ;; use-callback
 ;; hooks/use-callback
 (defnc world-view [{:keys [time] :as db}]
   (<>
-    ($ world-grid {& (select-keys db [:c->e->v :time])})
+    (hooks/use-memo [time] ($ world-grid {& (select-keys db [:c->e->v])}))
     overlay-grid-element
     (d/div {:style {:position "fixed"
                     :left     "130vh"

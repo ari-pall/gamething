@@ -117,33 +117,36 @@
       (create-tile p/grass [0 0])
       (create-entity p/player [0 0])))
 (defn key-up [db key]
-  (if-let [i (case key
-               "a"          0
-               "ArrowLeft"  0
-               "s"          1
-               "ArrowDown"  1
-               "d"          0
-               "ArrowRight" 0
-               "w"          1
-               "ArrowUp"    1
-               nil)]
-    (assoc-in db [:current-dir i] 0)
+  (if-let [kw (case key
+                "a"          :left
+                "ArrowLeft"  :left
+                "s"          :down
+                "ArrowDown"  :down
+                "d"          :right
+                "ArrowRight" :right
+                "w"          :up
+                "ArrowUp"    :up
+                nil)]
+    (update db :pressed-keys disj kw)
     db))
 (defn key-down [db key]
-  (if-let [[i val]
-           (case key
-             "a"          [0 -1]
-             "ArrowLeft"  [0 -1]
-             "s"          [1 -1]
-             "ArrowDown"  [1 -1]
-             "d"          [0 1]
-             "ArrowRight" [0 1]
-             "w"          [1 1]
-             "ArrowUp"    [1 1]
-             nil)]
+  (if-let [kw (case key
+                "a"          :left
+                "ArrowLeft"  :left
+                "s"          :down
+                "ArrowDown"  :down
+                "d"          :right
+                "ArrowRight" :right
+                "w"          :up
+                "ArrowUp"    :up
+                nil)]
     (-> db
-        (assoc-in [:move-dir i] val)
-        (assoc-in [:current-dir i] val))
+        (update :pressed-keys conj kw)
+        (update :new-pressed-keys conj kw)
+        (assoc (if (contains? #{:up :down} kw)
+                 :newest-pressed-y
+                 :newest-pressed-x)
+               kw))
     db))
 (defn get-player-id [{:keys [c->e->v] :as db}] (first (first (get-in c->e->v [:player]))))
 (defn get-player-component [{:keys [c->e->v] :as db} component] (get-in c->e->v [component (get-player-id db)]))
@@ -240,11 +243,36 @@
                                    c->e->v))
                                c->e->v
                                pos-es))))
-(defn player-movement [{:keys [c->e->v current-dir move-dir] :as db}]
+(def tonum {:left  -1
+            :right 1
+            :down  -1
+            :up    1
+            nil    0})
+(defn player-movement [{:keys [c->e->v pressed-keys new-pressed-keys newest-pressed-y newest-pressed-x] :as db}]
   (let [player-id (get-player-id db)
-        pos       (get-player-pos db)]
+        pos       (get-player-pos db)
+        dx        (tonum
+                    (cond
+                      (or (contains? new-pressed-keys :left)
+                          (contains? new-pressed-keys :right)) newest-pressed-x
+                      (and (contains? pressed-keys :left)
+                           (contains? pressed-keys :right))    newest-pressed-x
+                      (contains? pressed-keys :left)           :left
+                      (contains? pressed-keys :right)          :right
+                      true                                     nil))
+        dy        (tonum
+                    (cond
+                      (or (contains? new-pressed-keys :down)
+                          (contains? new-pressed-keys :up)) newest-pressed-y
+                      (and (contains? pressed-keys :down)
+                           (contains? pressed-keys :up))    newest-pressed-y
+                      (contains? pressed-keys :down)        :down
+                      (contains? pressed-keys :up)          :up
+                      true                                  nil))
+        move-dir  [dx dy]
+        ]
     (-> db
-        (assoc :move-dir current-dir)
+        (assoc :new-pressed-keys #{})
         (assoc :c->e->v (-> c->e->v
                             (pick-up-items-on-tile pos player-id)
                             (try-to-move player-id move-dir))))))
