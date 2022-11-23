@@ -75,12 +75,16 @@
         (map-indexed (fn [i e]
                        (let [[char name] (entity-components c->e->v e [:char :name])]
                          (d/p {& {:key   i
-                                  :class (if (= i (clamp 0 scroll-pos (dec (count list))))
+                                  :class (if (->> list
+                                                  count
+                                                  dec
+                                                  (clamp 0 scroll-pos)
+                                                  (= i))
+                                             ;; (= i (clamp 0 scroll-pos (dec (count list))))
                                            "border-solid border-2"
                                            "")}}
                               (str char " " name))))
-                     list)))
-    ))
+                     list)))))
 (stylefy/class "right-of-sidebar" {:position "fixed"
                                    :height   "100vh"
                                    :left     "30vh"})
@@ -143,35 +147,45 @@
 
 (def last-world-grid (atom nil))
 (def last-time (atom nil))
-(defnc world-grid [{:keys [c->e->v] :as db}]
-  (let [[posx posy] (get-player-pos db)]
-    (d/div
-      {:class "grid grid-style text-3xl select-none"}
-      (for [y reverse-grid-range
-            x grid-range]
-        (let [t                  [(+ x posx) (+ y posy)]
-              {:keys [bg-color]} (get-in c->e->v [:tile t])
-              es                 (conj (keys (get-in c->e->v [:container t])) t)
-              char               (get-in c->e->v [:char (last es)])
-              ]
-          (d/div {:class "overflow-hidden"
-                  &      {:key   t
-                          :style {:background-color bg-color}}}
-                 char))))))
+(defnc world-grid [{:keys [c->e->v time] :as db}]
+  ;; (js/console.log "bb")
+  (if (= time @last-time)
+    @last-world-grid
+    (let [[posx posy] (get-player-pos db)
+          grid        (d/div
+                        {:class "grid grid-style text-3xl select-none"
+                         }
+                        ;; (js/console.log "cc")
+                        (for [y reverse-grid-range
+                              x grid-range]
+                          (let [t                  [(+ x posx) (+ y posy)]
+                                {:keys [bg-color]} (get-in c->e->v [:tile t])
+                                es                 (conj (keys (get-in c->e->v [:container t])) t)
+                                char               (get-in c->e->v [:char (last es)])
+                                ]
+                            (d/div {:class "overflow-hidden"
+                                    &      {:key   t
+                                            :style {:background-color bg-color}}}
+                                   char))))]
+      (reset! last-time time)
+      (reset! last-world-grid grid)
+      grid)))
+;; use-memo
+;; use-callback
 (defnc world-view [{:keys [time] :as db}]
-  (<>
-    (if (= time @last-time)
-      @last-world-grid
-      (let [grid ($ world-grid {& (select-keys db [:c->e->v])})]
-        (reset! last-time time)
-        (reset! last-world-grid grid)
-        grid))
-    overlay-grid-element
-    (d/div {:style {:position "fixed"
-                    :left     "130vh"
-                    :height   "100vh"
-                    }}
-           ($ desc-popup {& (select-keys db [:c->e->v :mouse-over-relative-coord :scroll-pos])}))))
+  (d/div {}
+    (list
+      (d/div {& {:key time}}
+             ;; (js/console.log "aa")
+             ($ world-grid {& (select-keys db [:c->e->v :time])}))
+      (d/div {:key :overlay-grid} overlay-grid-element)
+      (d/div {:key :desc-popup
+              :style {:position "fixed"
+                      :left     "130vh"
+                      :height   "100vh"
+                      }}
+             ($ desc-popup {& (select-keys db [:c->e->v :mouse-over-relative-coord :scroll-pos])}))))
+  )
 ;; context...
 (defnc main-view []
   (let [[{:keys [current-view] :as db} set-state!] (hooks/use-state initial-db)]

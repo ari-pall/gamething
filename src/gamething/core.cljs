@@ -5,7 +5,7 @@
    [gamething.game :as game]
    [gamething.ui :as ui]
    ["react-dom/client" :as rdom]
-   [helix.core :refer [defnc $]]
+   ;; [helix.core :refer [defnc $]]
    [goog.dom :as gdom]
    )
   (:require-macros [gamething.macros :refer [defevent]]
