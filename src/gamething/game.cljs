@@ -220,29 +220,50 @@
                          e
                          (if (prob 0.5)
                            (mapv #(clamp -1 % 1)
-                                 ;; #(cond (<= % -1) -1
-                                 ;;            (>= % 1)  1
-                                 ;;            true      0)
                                  (vec- player-pos pos))
                            (rand-nth [[0 1] [0 -1] [-1 0] [1 0]])))
                        c->e->v))
                    c->e->v
                    (map vector affected pos-es)))))
-(defn harm [c->e->v e]
-  (update-in c->e->v [:hp e] dec))
-(defn adjacent? [pos1 pos2]
-  (every? #(<= -1 % 1) (map - pos1 pos2)))
-(defn attack-player [{:keys [c->e->v] :as db}]
-  (let [player-pos (get-player-pos db)
-        player-id  (get-player-id db)
-        affected   (keys (c->e->v :attack-player))
-        pos-es     (component-values c->e->v :pos affected)]
-    (assoc db :c->e->v (reduce (fn [c->e->v pos]
-                                 (if (adjacent? pos player-pos)
-                                   (harm c->e->v player-id)
-                                   c->e->v))
-                               c->e->v
-                               pos-es))))
+
+(defn remove-all-but [c->e->v e cs]
+  (reduce (fn [c->e->v c]
+            (update c->e->v c dissoc e))
+          c->e->v
+          (filter #(and (contains? (c->e->v %) e)
+                        (not (contains? (set cs) %)))
+                  (keys c->e->v))))
+(defn kill [{:keys [c->e->v] :as db} e]
+  (let [name (get-in c->e->v [:name e])]
+    (assoc (if (get-in c->e->v [:player e])
+             (add-message db (str "You were killed. Click ⌛→. Score: " (or (get-in c->e->v [:container (get-player-id db) :loot]) 0)))
+             db)
+           :c->e->v (-> c->e->v
+                        (remove-all-but e #{:player :pos :container})
+                        (assoc-in [:name e] (str "dead " name))
+                        (assoc-in [:char e] "☠")))))
+(defn harm
+  ([db e] (harm db e 1))
+  ([{:keys [c->e->v] :as db} e n]
+   (let [new-hp (- (get-in c->e->v [:hp e]) n)]
+     (if (<= new-hp 0)
+       (kill db e)
+       (assoc-in db [:c->e->v :hp e] new-hp)))))
+;; (defn adjacent? [pos1 pos2]
+;;   (every? #(<= -1 % 1) (map - pos1 pos2)))
+;; (concat [1 2] [3 4])
+;; (flatten [[1 2] [3 4]])
+(defn combat [{:keys [c->e->v] :as db}]
+  (let [es        (apply concat (for [x [-1 0 1]
+                                      y [-1 0 1]]
+                                  (get-entities-on-relative-coord db [x y])))
+        enemies   (filter #(get-in c->e->v [:attack-player %]) es)
+        player-id (get-player-id db)]
+    (-> (reduce (fn [db enemy]
+                  (harm db enemy))
+                db
+                enemies)
+        (harm player-id (count enemies)))))
 (def tonum {:left  -1
             :right 1
             :down  -1
@@ -254,21 +275,21 @@
         dx        (tonum
                     (cond
                       (or (contains? new-pressed-keys :left)
-                          (contains? new-pressed-keys :right)) newest-pressed-x
-                      (and (contains? pressed-keys :left)
-                           (contains? pressed-keys :right))    newest-pressed-x
-                      (contains? pressed-keys :left)           :left
-                      (contains? pressed-keys :right)          :right
-                      true                                     nil))
+                          (contains? new-pressed-keys :right)
+                          (and (contains? pressed-keys :left)
+                               (contains? pressed-keys :right))) newest-pressed-x
+                      (contains? pressed-keys :left)             :left
+                      (contains? pressed-keys :right)            :right
+                      true                                       nil))
         dy        (tonum
                     (cond
                       (or (contains? new-pressed-keys :down)
-                          (contains? new-pressed-keys :up)) newest-pressed-y
-                      (and (contains? pressed-keys :down)
-                           (contains? pressed-keys :up))    newest-pressed-y
-                      (contains? pressed-keys :down)        :down
-                      (contains? pressed-keys :up)          :up
-                      true                                  nil))
+                          (contains? new-pressed-keys :up)
+                          (and (contains? pressed-keys :down)
+                               (contains? pressed-keys :up))) newest-pressed-y
+                      (contains? pressed-keys :down)          :down
+                      (contains? pressed-keys :up)            :up
+                      true                                    nil))
         move-dir  [dx dy]
         ]
     (-> db
@@ -322,18 +343,16 @@
             (update :time dec)
             (update :history rest)
             ))
-      (if (<= (get-in c->e->v [:hp (get-player-id db)]) 0)
-        (-> db
-            (add-message (str "You were killed. Score: " (or (get-in c->e->v [:container (get-player-id db) :loot]) 0)))
-            (assoc :reverse-time? true))
+      (if (> (get-in c->e->v [:hp (get-player-id db)]) 0)
         (-> db
             (update :history conj c->e->v)
             (update :time inc)
             (update :c->e->v random-movement)
             player-movement
             enemy-movement
-            attack-player
-            )))
+            combat
+            )
+        db))
     db))
 
 (defn try-to-craft [{:keys [c->e->v] :as db} id]

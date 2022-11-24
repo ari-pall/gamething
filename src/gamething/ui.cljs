@@ -96,6 +96,7 @@
            (for [[k v] (filter second (dissoc aaa :name :char))]
              (d/p {:key k}
                   (str k " " v))))))
+;; (path :c->e->v :player)
 (defnc inventory-view [{:keys [c->e->v] :as db}]
   (let [player-id  (get-player-id db)
         player-inv (get-in c->e->v [:container player-id])]
@@ -151,6 +152,7 @@
   (d/div {:class "overflow-hidden"
           &      {:style {:background-color bg-color}}}
          char))
+;; (path :newest-pressed-x)
 (defnc world-grid [{:keys [c->e->v] :as db}]
   ;; (js/console.log "bb")
   (d/div

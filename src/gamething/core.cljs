@@ -8,7 +8,8 @@
    [helix.core :refer [defnc $]]
    [goog.dom :as gdom]
    )
-  (:require-macros [gamething.macros :refer [defevent]]
+  (:require-macros [gamething.macros :refer [;; defevent
+                                             ]]
                    [helix.core :refer [;; $
                                        ]]))
 
@@ -28,8 +29,7 @@
     (stylefy/init {:dom (stylefy-generic-dom/init)})
     (.render root
              ($ ui/main-view))
-    (js/setInterval #(ui/! game/tick) 75 ;; 75
-                    )
+    (js/setInterval #(ui/! game/tick) 75)
     (.addEventListener js/window "wheel"
                        #(ui/! game/scroll (if (< (.-wheelDeltaY %) 0)
                                             1
@@ -40,7 +40,6 @@
     (.addEventListener js/window "keydown"
                        #(when-not (.-repeat %)
                           (ui/! game/key-down (.-key %))))
-
     ))
 
 ;; (shadow.cljs.devtools.client.browser/ws-status)

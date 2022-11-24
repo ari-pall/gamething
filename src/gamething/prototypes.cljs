@@ -49,6 +49,7 @@
             :name "enemy"
             :enemy-movement true
             :attack-player true
+            :hp 30
             })
 (def snowman {:name            "snowman"
               :char            "⛄"
