@@ -24,7 +24,5 @@
    :new-pressed-keys #{}
    :newest-pressed-y nil
    :newest-pressed-x nil
-   ;; :current-dir  [0 0]
-   ;; :move-dir     [0 0]
    :current-view :world-view
    })

@@ -181,7 +181,13 @@
   (map #(% e) (map c->e->v cs)))
 (defn pick-up-items-on-tile [c->e->v t player-id]
   (let [tile-contents  (keys (get-in c->e->v [:container t]))
-        takeable-items (map first (filter second (map vector tile-contents (component-values c->e->v :takeable tile-contents))))]
+        ;; takeable-items (->> tile-contents
+        ;;                     (component-values c->e->v :takeable)
+        ;;                     (map vector tile-contents)
+        ;;                     (filter second)
+        ;;                     (map first))
+        takeable-items (map first (filter second (map vector tile-contents (component-values c->e->v :takeable tile-contents))))
+        ]
     (container-transfer c->e->v t player-id (zipmap takeable-items (map #(get-in c->e->v [:container t %]) takeable-items)))))
 (defn try-to-move [c->e->v e [dirx diry]]
   (let [pos  (get-in c->e->v [:pos e])
@@ -225,7 +231,6 @@
                        c->e->v))
                    c->e->v
                    (map vector affected pos-es)))))
-
 (defn remove-all-but [c->e->v e cs]
   (reduce (fn [c->e->v c]
             (update c->e->v c dissoc e))
@@ -242,28 +247,38 @@
                         (remove-all-but e #{:player :pos :container})
                         (assoc-in [:name e] (str "dead " name))
                         (assoc-in [:char e] "☠")))))
-(defn harm
-  ([db e] (harm db e 1))
-  ([{:keys [c->e->v] :as db} e n]
-   (let [new-hp (- (get-in c->e->v [:hp e]) n)]
-     (if (<= new-hp 0)
-       (kill db e)
-       (assoc-in db [:c->e->v :hp e] new-hp)))))
+(defn harm [{:keys [c->e->v] :as db} e n]
+  (let [new-hp (- (get-in c->e->v [:combat e :hp]) n)]
+    (if (<= new-hp 0)
+      (kill db e)
+      (assoc-in db [:c->e->v :combat e :hp] new-hp))))
 ;; (defn adjacent? [pos1 pos2]
 ;;   (every? #(<= -1 % 1) (map - pos1 pos2)))
 ;; (concat [1 2] [3 4])
 ;; (flatten [[1 2] [3 4]])
+(defn maximize [f coll]
+  (reduce (fn [v v2]
+            (if (< (f v) (f v2))
+              v2
+              v))
+          (first coll)
+          coll))
 (defn combat [{:keys [c->e->v] :as db}]
-  (let [es        (apply concat (for [x [-1 0 1]
-                                      y [-1 0 1]]
-                                  (get-entities-on-relative-coord db [x y])))
-        enemies   (filter #(get-in c->e->v [:attack-player %]) es)
-        player-id (get-player-id db)]
-    (-> (reduce (fn [db enemy]
-                  (harm db enemy))
-                db
-                enemies)
-        (harm player-id (count enemies)))))
+  (let [es            (apply concat (for [x [-1 0 1]
+                                          y [-1 0 1]]
+                                      (get-entities-on-relative-coord db [x y])))
+        enemies       (filter #(get-in c->e->v [:attack-player %]) es)
+        target-enemy  (first (maximize (fn [e {:keys [hp damage]}]
+                                        (/ damage hp))
+                                      (map vector enemies (component-values c->e->v :combat enemies))))
+        player-id     (get-player-id db)
+        player-damage (get-in c->e->v [:combat player-id :damage])
+        ]
+    (if target-enemy
+      (-> db
+          (harm target-enemy player-damage)
+          (harm player-id (count enemies)))
+      db)))
 (def tonum {:left  -1
             :right 1
             :down  -1
@@ -324,8 +339,8 @@
       (add-message db "you don't have a snowman"))))
 (defn mouse-over-relative-coord [db coord]
   (assoc db :mouse-over-relative-coord coord))
-(defn world-click [{:keys [scroll-pos] :as db} relative-coord]
-  (let [es (get-entities-on-relative-coord db relative-coord)
+(defn world-click [{:keys [scroll-pos mouse-over-relative-coord] :as db}]
+  (let [es (get-entities-on-relative-coord db mouse-over-relative-coord)
         i  (clamp 0 scroll-pos (dec (count es)))
         e  (nth es i)]
     (assoc db
@@ -343,7 +358,7 @@
             (update :time dec)
             (update :history rest)
             ))
-      (if (> (get-in c->e->v [:hp (get-player-id db)]) 0)
+      (if (> (get-in c->e->v [:combat (get-player-id db) :hp]) 0)
         (-> db
             (update :history conj c->e->v)
             (update :time inc)
@@ -375,9 +390,7 @@
 (comment
   ;; (.fillText context "hello world 🤡" 50 90 140)
   dorun
-  dorun
   for
-
   set!
   aget
   (def canvas (js/document.getElementById "canvas"))

@@ -69,7 +69,7 @@
     (d/p {:class "text-yellow-200"}
          (str "score: " (or (get-in c->e->v [:container (get-player-id db) :loot]) 0)))
     (d/p {:class "text-green-500"}
-         (str "hp: " (or (get-in c->e->v [:hp (get-player-id db)]) 0)))
+         (str "hp: " (or (get-in c->e->v [:combat (get-player-id db) :hp]) 0)))
     (if mouse-over-relative-coord
       (let [list (game/get-entities-on-relative-coord db mouse-over-relative-coord)]
         (map-indexed (fn [i e]
@@ -143,22 +143,17 @@
         {:class "bg-white opacity-0 hover:opacity-20 hover:animate-pulse"
          &      {:key           [x y]
                  :on-mouse-over #(! game/mouse-over-relative-coord [x y])
-                 :on-click      #(! game/world-click [x y])}}))))
+                 :on-click      #(! game/world-click)}}))))
 (def overlay-grid-element ($ overlay-grid))
 
-(def last-world-grid (atom nil))
-(def last-time (atom nil))
 (defnc world-grid-cell [{:keys [bg-color char]}]
   (d/div {:class "overflow-hidden"
           &      {:style {:background-color bg-color}}}
          char))
-;; (path :newest-pressed-x)
 (defnc world-grid [{:keys [c->e->v] :as db}]
-  ;; (js/console.log "bb")
   (d/div
     {:class "grid grid-style text-3xl select-none"
      }
-    ;; (js/console.log "cc")
     (let [[posx posy] (get-player-pos db)]
       (for [y reverse-grid-range
             x grid-range]
@@ -169,18 +164,7 @@
               ]
           ($ world-grid-cell {& {:key t
                                  :bg-color bg-color
-                                 :char     char}})))))
-  ;; (hooks/use-memo
-  ;;   [time]
-  ;;   )
-  ;; (if (= time @last-time)
-  ;;   @last-world-grid
-  ;; (let [[posx posy] (get-player-pos db)
-  ;;       grid        ]
-  ;;     (reset! last-time time)
-  ;;     (reset! last-world-grid grid)
-  ;;     grid))
-  )
+                                 :char     char}}))))))
 ;; use-memo
 ;; use-callback
 ;; hooks/use-callback
@@ -192,25 +176,7 @@
                     :left     "130vh"
                     :height   "100vh"
                     }}
-           ($ desc-popup {& (select-keys db [:c->e->v :mouse-over-relative-coord :scroll-pos])})))
-  ;; (d/div {}
-  ;;   (list
-  ;;     (d/div {& {:key time}}
-  ;;            ;; (js/console.log "aa")
-  ;;            (if (= time @last-time)
-  ;;              @last-world-grid
-  ;;              ($ world-grid {& (select-keys db [:c->e->v :time])}))
-  ;;            ;; (hooks/use-memo [time] (do ;; (js/console.log "aaaa")
-  ;;            ;;                         ))
-  ;;            )
-  ;;     (d/div {:key :overlay-grid} overlay-grid-element)
-  ;;     (d/div {:key :desc-popup
-  ;;             :style {:position "fixed"
-  ;;                     :left     "130vh"
-  ;;                     :height   "100vh"
-  ;;                     }}
-  ;;            ($ desc-popup {& (select-keys db [:c->e->v :mouse-over-relative-coord :scroll-pos])}))))
-  )
+           ($ desc-popup {& (select-keys db [:c->e->v :mouse-over-relative-coord :scroll-pos])}))))
 ;; context...
 (defnc main-view []
   (let [[{:keys [current-view] :as db} set-state!] (hooks/use-state initial-db)]
@@ -221,7 +187,6 @@
             :class         "h-screen w-screen bg-gray-600 font-mono text-red-200 text-lg overflow-hidden"
             :id "main-view"
             }
-
            (d/div {:class "flex-none"
                    :style {:position "fixed"
                            :height   "100vh"
@@ -234,5 +199,4 @@
              :crafting-view  ($ crafting-view {& (select-keys db [:c->e->v])})
              ;; :stats-view     ($ stats-view (select-keys db [:c->e->v]))
              ;; :abilities-view ($ abilities-view (select-keys db [:c->e->v]))
-             (d/p {:class "right-of-sidebar"} (kw->str current-view))
-             ))))
+             (d/p {:class "right-of-sidebar"} (kw->str current-view))))))

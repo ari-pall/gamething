@@ -39,17 +39,19 @@
              :name "ladder"
              :char "🪜"
              :portal :cave})
-(def player {:char   (rand-nth ["🤓" "🐸" "😠" "🤡" "😳" "😔" "😐" "🤤" "🙃" "🙂" ])
-             :name   "player"
-             :player true
+(def player {:char      (rand-nth ["🤓" "🐸" "😠" "🤡" "😳" "😔" "😐" "🤤" "🙃" "🙂" ])
+             :name      "player"
+             :player    true
              :container {}
-             :hp 300
+             :combat    {:hp     300
+                         :damage 3}
              })
-(def enemy {:char "👿"
-            :name "enemy"
+(def enemy {:char           "👿"
+            :name           "enemy"
             :enemy-movement true
-            :attack-player true
-            :hp 30
+            :attack-player  true
+            :combat         {:hp     30
+                             :damage 1}
             })
 (def snowman {:name            "snowman"
               :char            "⛄"
