@@ -114,7 +114,7 @@
                                 (for [kw    (keys p/items)
                                       [c v] (p/items kw)]
                                   [c kw v])))
-      (create-tile p/grass [0 0])
+      ;; (create-tile p/grass [0 0])
       (create-entity p/player [0 0])))
 (defn key-up [db key]
   (if-let [kw (case key
@@ -263,16 +263,24 @@
               v))
           (first coll)
           coll))
+
+(defn get-adjacent-entities-with-component [{:keys [c->e->v] :as db} c]
+  (filter #(contains? (c->e->v c) %)
+          (apply concat (for [x [-1 0 1]
+                              y [-1 0 1]]
+                          (get-entities-on-relative-coord db [x y])))))
+
 (defn combat [{:keys [c->e->v] :as db}]
-  (let [es            (apply concat (for [x [-1 0 1]
-                                          y [-1 0 1]]
-                                      (get-entities-on-relative-coord db [x y])))
-        enemies       (filter #(get-in c->e->v [:attack-player %]) es)
-        target-enemy  (first (maximize (fn [e {:keys [hp damage]}]
-                                        (/ damage hp))
-                                      (map vector enemies (component-values c->e->v :combat enemies))))
-        player-id     (get-player-id db)
-        player-damage (get-in c->e->v [:combat player-id :damage])
+  (let [;; es               (apply concat (for [x [-1 0 1]
+        ;;                                      y [-1 0 1]]
+        ;;                                  (get-entities-on-relative-coord db [x y])))
+        ;; enemies          (filter #(get-in c->e->v [:attack-player %]) es)
+        enemies (get-adjacent-entities-with-component db :attack-player)
+        [target-enemy _] (maximize (fn [[e {:keys [hp damage]}]]
+                                     (/ damage hp))
+                                   (map vector enemies (component-values c->e->v :combat enemies)))
+        player-id        (get-player-id db)
+        player-damage    (get-in c->e->v [:combat player-id :damage])
         ]
     (if target-enemy
       (-> db
@@ -307,11 +315,13 @@
                       true                                    nil))
         move-dir  [dx dy]
         ]
-    (-> db
-        (assoc :new-pressed-keys #{})
-        (assoc :c->e->v (-> c->e->v
-                            (pick-up-items-on-tile pos player-id)
-                            (try-to-move player-id move-dir))))))
+    (if (= move-dir [0 0])
+      db
+      (-> db
+          (assoc :new-pressed-keys #{})
+          (assoc :c->e->v (-> c->e->v
+                              (pick-up-items-on-tile pos player-id)
+                              (try-to-move player-id move-dir)))))))
 (def grid-side-length (inc (* 2 view-radius)))
 
 (def black-tile [:p.aspect-square {:style {:background-color "#000000"}} " "])
@@ -370,6 +380,15 @@
         db))
     db))
 
+(defn interact [{:keys [c->e->v] :as db} e]
+  (let [[type v] (get-in c->e->v [:interact e])]
+    (case type
+      :message   (add-message db v)
+      :give-item (-> db
+                     (add-message (str "You got " (kw->str 1 v)))
+                     (create-item v (get-player-id db)))
+      (add-message db (str type " " v)))))
+
 (defn try-to-craft [{:keys [c->e->v] :as db} id]
   (if-let [recipe (crafting-recipes id)]
     (let [t (update (zipmap (keys recipe)
@@ -383,6 +402,7 @@
             (add-message (str "You crafted " (kw->str 1 id))))
         (add-message db "You don't have the items to craft that")))
     (add-message db "You can't craft that")))
+
 
 (def init #(-> db/default-db
                generate-level))

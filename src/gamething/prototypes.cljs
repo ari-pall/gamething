@@ -7,10 +7,15 @@
            :name "wall"
            :char "#"
            })
-(def water {:tile {:type     :wall
-                   :bg-color "#5961FF"
-                   }
-            :name "water"
+(def fish {:char     "🐟"
+           :name     "fish"
+           :takeable true
+           })
+(def water {:tile     {:type     :wall
+                       :bg-color "#5961FF"
+                       }
+            :name     "water"
+            :interact [:give-item :fish]
             })
 (def sand {:tile {:type     :floor
                   :bg-color "#D9DC60"
@@ -22,6 +27,7 @@
                   }
            :name "tree"
            :char "🌲"
+           :interact  [:give-item :wood];; [:message "you punch the tree"]
            })
 (def rock {:tile {:type     :wall
                   :bg-color "#71A269"
@@ -36,15 +42,16 @@
             })
 (def ladder {:tile {:type :floor
                     :bg-color "#4A4A4A"}
-             :name "ladder"
+             :name "ladder down"
              :char "🪜"
-             :portal :cave})
+             :on-player-step :go-to-cave
+             })
 (def player {:char      (rand-nth ["🤓" "🐸" "😠" "🤡" "😳" "😔" "😐" "🤤" "🙃" "🙂" ])
              :name      "player"
              :player    true
              :container {}
              :combat    {:hp     300
-                         :damage 3}
+                         :damage 2}
              })
 (def enemy {:char           "👿"
             :name           "enemy"
@@ -74,9 +81,52 @@
              :random-movement true
              })
 (def chest {:container {}})
-(def items {:loot  {:char     "💰"
-                    :name     "loot"
-                    :takeable true
-                    }
-
+(def items {:loot {:char     "💰"
+                   :name     "loot"
+                   :takeable true
+                   }
+            :wood {:char     "🪵"
+                   :name     "wood"
+                   :takeable true
+                   }
+            :fish {:char     "🐟"
+                   :name     "fish"
+                   :takeable true
+                   }
             })
+;; (def tiles {:wall  {:tile {:type     :wall
+;;                            :bg-color "#717171"
+;;                            }
+;;                     :name "wall"
+;;                     :char "#"
+;;                     }
+;;             :water {:tile     {:type     :wall
+;;                                :bg-color "#5961FF"
+;;                                }
+;;                     :name     "water"
+;;                     :interact [:add-item]
+;;                     }
+;;             :sand  {:tile {:type     :floor
+;;                            :bg-color "#D9DC60"
+;;                            }
+;;                     :name "sand"
+;;                     }
+;;             :tree  {:tile     {:type     :wall
+;;                                :bg-color "#27AD00"
+;;                                }
+;;                     :name     "tree"
+;;                     :char     "🌲"
+;;                     :interact [:message "you punch the tree"]
+;;                     }
+;;             :rock  {:tile {:type     :wall
+;;                            :bg-color "#71A269"
+;;                            }
+;;                     :name "rock"
+;;                     :char "🪨"
+;;                     }
+;;             :grass {:tile {:type     :floor
+;;                            :bg-color "#22B800"
+;;                            }
+;;                     :name "grass"
+;;                     }
+;;             })

@@ -63,13 +63,38 @@
       )
     ($ message-log-view {& {:message-log message-log}})))
 ;; (def x aaaaaaaaaaaa)
+;; (defnc actions-list [{:keys [c->e->v] :as db}]
+;;   (d/div
+;;     {:class "flex flex-col h-full bg-gray-600 font-mono text-red-200 text-lg"}
+;;     (d/div {:class "right-of-sidebar p-7 text-black flex-col flex w-80 space-y-2"}
+;;            (d/p {:class "p-1"}
+;;                 "You have:")
+;;            (for [[id recipe] crafting-recipes]
+;;              (let [num (or (get player-inv id) 0)]
+;;                (d/button {:class "rounded-full bg-gray-300 hover:bg-green-300 py-1"
+;;                           &      {:key      id
+;;                                   :on-click #(! game/try-to-craft id)}}
+;;                          (game/kw->str num id)))))
+;;     ))
+;; ↙
+;; (defnc rect-button [{}])
+;; (d/button {:class "rounded-full bg-gray-300 hover:bg-green-300 py-1"
+;;                           & {:key id
+;;                              :on-click #(! game/try-to-craft id)}}
+;;                          (game/kw->str num id))
 (defnc desc-popup [{:keys [c->e->v mouse-over-relative-coord scroll-pos] :as db}]
   (d/div
-    {:class "flex flex-col bg-gray-600 font-mono text-red-200 text-lg"}
+    {:class "flex flex-col h-full bg-gray-600 font-mono text-red-200 text-lg"}
     (d/p {:class "text-yellow-200"}
          (str "score: " (or (get-in c->e->v [:container (get-player-id db) :loot]) 0)))
     (d/p {:class "text-green-500"}
          (str "hp: " (or (get-in c->e->v [:combat (get-player-id db) :hp]) 0)))
+    (for [e (game/get-adjacent-entities-with-component db :interact)]
+      (let [[char name] (game/entity-components c->e->v e [:char :name])]
+        (d/button {:class "rounded-full focus:outline-none text-black bg-gray-300 hover:bg-green-300 py-1"
+                   &      {:key      e
+                           :on-click #(! game/interact e)}}
+                  (str char " " name))))
     (if mouse-over-relative-coord
       (let [list (game/get-entities-on-relative-coord db mouse-over-relative-coord)]
         (map-indexed (fn [i e]
@@ -80,7 +105,7 @@
                                                   dec
                                                   (clamp 0 scroll-pos)
                                                   (= i))
-                                             ;; (= i (clamp 0 scroll-pos (dec (count list))))
+                                           ;; (= i (clamp 0 scroll-pos (dec (count list))))
                                            "border-solid border-2"
                                            "")}}
                               (str char " " name))))
@@ -106,7 +131,7 @@
                 "You have:")
            (for [[id num] player-inv]
              (d/p {:key id}
-                  (game/kw->str num id))))))
+                  (str (game/kw->str num id) " " (get-in c->e->v [:char id])))))))
 (defnc crafting-view [{:keys [c->e->v] :as db}]
   (let [player-id  (get-player-id db)
         player-inv (get-in c->e->v [:container player-id])]
