@@ -1,22 +1,42 @@
 (ns gamething.game
   (:require
-   [applied-science.js-interop :as j]
+   ;; [applied-science.js-interop :as j]
    [gamething.db :as db]
    [gamething.prototypes :as p]
    ;; [schema.core :as s :include-macros true]
-   ))
+   )
+  ;; (:require-macros [gamething.macros :refer []]
+  ;;                  [helix.core :refer [;; $
+  ;;                                      ]])
+  )
 
 
 (defn valid-transaction? [inv t]
   (not-any? neg? (vals (merge-with + t (select-keys inv (keys t))))))
 (defn do-transaction [inv t] (merge-with + inv t))
 
-(defn vec- ([a b]
-            (mapv - a b))
-  ([& vs] (apply mapv - vs)))
-(defn vec+ ([a b]
-            (mapv + a b))
-  ([& vs] (apply mapv - vs)))
+(defn vec-
+  ([a b]
+   (mapv - a b))
+  ([a b c]
+   (mapv - a b c))
+  ;; ([& vs] (apply mapv - vs))
+  )
+(defn vec+
+  ([a b]
+   (mapv + a b))
+  ([a b c]
+   (mapv + a b c))
+  ;; ([& vs] (apply mapv - vs))
+  )
+
+
+;; (defn vec- ([a b]
+;;             (mapv - a b))
+;;   ([& vs] (apply mapv - vs)))
+;; (defn vec+ ([a b]
+;;             (mapv + a b))
+;;   ([& vs] (apply mapv - vs)))
 (defn kw->str
   ([kw] (clojure.string/replace (.-name kw) #"-" " "))
   ([n kw] (let [name (kw->str kw)]
@@ -256,32 +276,39 @@
 ;;   (every? #(<= -1 % 1) (map - pos1 pos2)))
 ;; (concat [1 2] [3 4])
 ;; (flatten [[1 2] [3 4]])
-(defn maximize [f coll]
-  (reduce (fn [v v2]
-            (if (< (f v) (f v2))
-              v2
-              v))
-          (first coll)
-          coll))
+;; max-key
+(defn most [f coll]
+  (first (reduce (fn [a b]
+                   (max-key second a b))
+                 (map #(vector % (f %)) coll))))
+(defn least [f coll]
+  (-> [a b]
+      (fn (min-key second a b))
+      (reduce (map #(vector % (f %)) coll))
+      first))
+;; (defn least [f coll]
+;;   (most (comp - f) coll))
+
+;; (defn maximize [f coll]
+;;   (reduce (fn [v v2]
+;;             (if (< (f v) (f v2))
+;;               v2
+;;               v))
+;;           (first coll)
+;;           coll))
 
 (defn get-adjacent-entities-with-component [{:keys [c->e->v] :as db} c]
   (filter #(contains? (c->e->v c) %)
           (apply concat (for [x [-1 0 1]
                               y [-1 0 1]]
                           (get-entities-on-relative-coord db [x y])))))
-
 (defn combat [{:keys [c->e->v] :as db}]
-  (let [;; es               (apply concat (for [x [-1 0 1]
-        ;;                                      y [-1 0 1]]
-        ;;                                  (get-entities-on-relative-coord db [x y])))
-        ;; enemies          (filter #(get-in c->e->v [:attack-player %]) es)
-        enemies (get-adjacent-entities-with-component db :attack-player)
-        [target-enemy _] (maximize (fn [[e {:keys [hp damage]}]]
-                                     (/ damage hp))
-                                   (map vector enemies (component-values c->e->v :combat enemies)))
+  (let [enemies          (get-adjacent-entities-with-component db :attack-player)
+        [target-enemy _] (most (fn [[e {:keys [hp damage]}]]
+                                 (/ damage hp))
+                               (map vector enemies (component-values c->e->v :combat enemies)))
         player-id        (get-player-id db)
-        player-damage    (get-in c->e->v [:combat player-id :damage])
-        ]
+        player-damage    (get-in c->e->v [:combat player-id :damage])]
     (if target-enemy
       (-> db
           (harm target-enemy player-damage)
@@ -324,6 +351,13 @@
                               (try-to-move player-id move-dir)))))))
 (def grid-side-length (inc (* 2 view-radius)))
 
+;; (println (str #(let [a (inc %)]
+;;                  (* a %))))
+;; (println (str #(if (> 5 %)
+;;                   (let [a (dec %)]
+;;                     (* a a))
+;;                   (let [a (inc %)]
+;;                     (* a a)))))
 (def black-tile [:p.aspect-square {:style {:background-color "#000000"}} " "])
 (def grid-range (range (- view-radius) (inc view-radius)))
 (def reverse-grid-range (reverse grid-range))
@@ -350,13 +384,12 @@
 (defn mouse-over-relative-coord [db coord]
   (assoc db :mouse-over-relative-coord coord))
 (defn world-click [{:keys [scroll-pos mouse-over-relative-coord] :as db}]
-  (let [es (get-entities-on-relative-coord db mouse-over-relative-coord)
+  (let [es (reverse (get-entities-on-relative-coord db mouse-over-relative-coord))
         i  (clamp 0 scroll-pos (dec (count es)))
         e  (nth es i)]
     (assoc db
            :selected-entity e
-           :current-view :entity-view
-           )))
+           :current-view :entity-view)))
 (def initial-db (generate-level db/default-db))
 (defn tick [{:keys [c->e->v reverse-time? history current-view] :as db}]
   (if (= current-view :world-view)

@@ -16,10 +16,14 @@
    [helix.hooks :as hooks]
    [helix.dom :as d]
    )
-  (:require-macros [gamething.macros :refer []]
-                   [helix.core :refer [;; $
-                                       ]]))
+  ;; (:require-macros [gamething.macros :refer []]
+  ;;                  [helix.core :refer [;; $
+  ;;                                      ]])
+  )
 
+;; (def x (+ '() '()))
+;; (def x (+ 3 '()))
+;; (def a baaaaaaaaaa)
 (def setter (atom nil))
 (defn ! [f & args]
   (@setter (fn [db] (apply f db args))))
@@ -39,8 +43,9 @@
          (map-indexed (fn [i message]
                         (d/p {& {:key i}} message))
                       message-log)))
+"active:bg-green-600"
 (defnc grid-button [{:keys [on-click children]}]
-  (d/button {:class "hover:text-4xl h-14 focus:outline-none hover:bg-green-300"
+  (d/button {:class "hover:text-4xl h-14 focus:outline-none hover:bg-green-300 active:bg-green-400"
              &      {:on-click on-click}}
             children))
 (defnc sidebar [{:keys [reverse-time? message-log]}]
@@ -62,20 +67,6 @@
                                                             "⌛→"))
       )
     ($ message-log-view {& {:message-log message-log}})))
-;; (def x aaaaaaaaaaaa)
-;; (defnc actions-list [{:keys [c->e->v] :as db}]
-;;   (d/div
-;;     {:class "flex flex-col h-full bg-gray-600 font-mono text-red-200 text-lg"}
-;;     (d/div {:class "right-of-sidebar p-7 text-black flex-col flex w-80 space-y-2"}
-;;            (d/p {:class "p-1"}
-;;                 "You have:")
-;;            (for [[id recipe] crafting-recipes]
-;;              (let [num (or (get player-inv id) 0)]
-;;                (d/button {:class "rounded-full bg-gray-300 hover:bg-green-300 py-1"
-;;                           &      {:key      id
-;;                                   :on-click #(! game/try-to-craft id)}}
-;;                          (game/kw->str num id)))))
-;;     ))
 ;; ↙
 ;; (defnc rect-button [{}])
 ;; (d/button {:class "rounded-full bg-gray-300 hover:bg-green-300 py-1"
@@ -91,12 +82,12 @@
          (str "hp: " (or (get-in c->e->v [:combat (get-player-id db) :hp]) 0)))
     (for [e (game/get-adjacent-entities-with-component db :interact)]
       (let [[char name] (game/entity-components c->e->v e [:char :name])]
-        (d/button {:class "rounded-full focus:outline-none text-black bg-gray-300 hover:bg-green-300 py-1"
+        (d/button {:class "rounded-full  focus:outline-none text-black bg-gray-300 hover:bg-green-300 active:bg-green-400 py-1"
                    &      {:key      e
                            :on-click #(! game/interact e)}}
                   (str char " " name))))
     (if mouse-over-relative-coord
-      (let [list (game/get-entities-on-relative-coord db mouse-over-relative-coord)]
+      (let [list (reverse (game/get-entities-on-relative-coord db mouse-over-relative-coord))]
         (map-indexed (fn [i e]
                        (let [[char name] (entity-components c->e->v e [:char :name])]
                          (d/p {& {:key   i
@@ -133,15 +124,14 @@
              (d/p {:key id}
                   (str (game/kw->str num id) " " (get-in c->e->v [:char id])))))))
 (defnc crafting-view [{:keys [c->e->v] :as db}]
-  (let [player-id  (get-player-id db)
-        player-inv (get-in c->e->v [:container player-id])]
+  (let [player-inv (get-player-component db :container)]
     ;; (js/console.log (str player-inv))
     (d/div {:class "right-of-sidebar p-7 text-black flex-col flex w-80 space-y-2"}
            (d/p {:class "p-1"}
                 "You have:")
            (for [[id recipe] crafting-recipes]
              (let [num (or (get player-inv id) 0)]
-               (d/button {:class "rounded-full bg-gray-300 hover:bg-green-300 py-1"
+               (d/button {:class "rounded-full bg-gray-300 hover:bg-green-300 active:bg-green-400 py-1"
                           & {:key id
                              :on-click #(! game/try-to-craft id)}}
                          (game/kw->str num id)))))))

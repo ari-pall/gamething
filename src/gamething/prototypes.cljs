@@ -1,6 +1,5 @@
 (ns gamething.prototypes)
 
-
 (def wall {:tile {:type     :wall
                   :bg-color "#717171"
                   }

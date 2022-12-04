@@ -1,15 +1,8 @@
 (ns gamething.db)
 
+;; (def x (+ '() '()))
 (def default-db
   {
-   ;; :keys {:pressed {:left nil
-   ;;                  :right nil
-   ;;                  :up nil
-   ;;                  :down nil
-   ;;                  }
-   ;;        :last-x :left
-   ;;        :last-y :up
-   ;;        }
    :mouse-over-relative-coord nil
    :scroll-pos 0
    :entity-count 0
