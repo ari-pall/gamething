@@ -44,8 +44,13 @@
                         (d/p {& {:key i}} message))
                       message-log)))
 "active:bg-green-600"
-(defnc grid-button [{:keys [on-click children]}]
-  (d/button {:class "hover:text-4xl h-14 focus:outline-none hover:bg-green-300 active:bg-green-400"
+;; (defnc grid-button [{:keys [on-click children]}]
+;;   (d/button {:class "hover:text-4xl h-14 focus:outline-none hover:bg-green-300 active:bg-green-400"
+;;              &      {:on-click on-click}}
+;;             children))
+
+(defnc button [:keys [on-click children]]
+  (d/button {:class "focus:outline-none text-black bg-gray-300 hover:bg-green-300 active:bg-green-400"
              &      {:on-click on-click}}
             children))
 (defnc sidebar [{:keys [reverse-time? message-log]}]
@@ -54,15 +59,15 @@
     ;; (d/p {:class "border-2 border-solid"} "aaaaa")
     (d/div
       {:class "grid grid-cols-4 auto-rows-fr select-none bg-gray-300 text-3xl text-black"}
-      ($ grid-button {:on-click #(! game/set-current-view :world-view)} "👀")
-      ;; ($ grid-button {:on-click #(set-current-view :abilities-view)} "🪄")
-      ($ grid-button {:on-click #(! game/try-to-spawn-snowman)} "⛄")
-      ;; ($ grid-button {:on-click spawn-strange-creature} "🔎")
-      ($ grid-button {:on-click #(! game/set-current-view :inventory-view)} "👜")
-      ;; ($ grid-button {:on-click #(set-current-view :stats-view)} "📜")
-      ($ grid-button {:on-click #(! game/set-current-view :crafting-view)} "🛠")
-      ($ grid-button {:on-click #(! game/spawn-strange-creature)} "👿")
-      ($ grid-button {:on-click #(! game/toggle-reverse-time)} (if reverse-time?
+      ($ button {:on-click #(! game/set-current-view :world-view)} "👀")
+      ;; ($ button {:on-click #(set-current-view :abilities-view)} "🪄")
+      ($ button {:on-click #(! game/try-to-spawn-snowman)} "⛄")
+      ;; ($ button {:on-click spawn-strange-creature} "🔎")
+      ($ button {:on-click #(! game/set-current-view :inventory-view)} "👜")
+      ;; ($ button {:on-click #(set-current-view :stats-view)} "📜")
+      ($ button {:on-click #(! game/set-current-view :crafting-view)} "🛠")
+      ($ button {:on-click #(! game/spawn-strange-creature)} "👿")
+      ($ button {:on-click #(! game/toggle-reverse-time)} (if reverse-time?
                                                             "←⌛"
                                                             "⌛→"))
       )
