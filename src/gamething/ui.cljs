@@ -43,41 +43,34 @@
          (map-indexed (fn [i message]
                         (d/p {& {:key i}} message))
                       message-log)))
-"active:bg-green-600"
-;; (defnc grid-button [{:keys [on-click children]}]
-;;   (d/button {:class "hover:text-4xl h-14 focus:outline-none hover:bg-green-300 active:bg-green-400"
-;;              &      {:on-click on-click}}
-;;             children))
-
-(defnc button [:keys [on-click children]]
-  (d/button {:class "focus:outline-none text-black bg-gray-300 hover:bg-green-300 active:bg-green-400"
-             &      {:on-click on-click}}
+(defnc button [{:keys [on-click children class]}]
+  (d/button {:class (str class " focus:outline-none text-black bg-gray-300 hover:bg-green-300 active:bg-green-400")
+             :on-click on-click}
             children))
+(defnc grid-button [{:keys [on-click children]}]
+  ($ button {:class "hover:text-4xl h-14"
+             :on-click on-click}
+     children))
 (defnc sidebar [{:keys [reverse-time? message-log]}]
   (d/div
     {:class "flex flex-col"}
     ;; (d/p {:class "border-2 border-solid"} "aaaaa")
     (d/div
       {:class "grid grid-cols-4 auto-rows-fr select-none bg-gray-300 text-3xl text-black"}
-      ($ button {:on-click #(! game/set-current-view :world-view)} "👀")
-      ;; ($ button {:on-click #(set-current-view :abilities-view)} "🪄")
-      ($ button {:on-click #(! game/try-to-spawn-snowman)} "⛄")
-      ;; ($ button {:on-click spawn-strange-creature} "🔎")
-      ($ button {:on-click #(! game/set-current-view :inventory-view)} "👜")
-      ;; ($ button {:on-click #(set-current-view :stats-view)} "📜")
-      ($ button {:on-click #(! game/set-current-view :crafting-view)} "🛠")
-      ($ button {:on-click #(! game/spawn-strange-creature)} "👿")
-      ($ button {:on-click #(! game/toggle-reverse-time)} (if reverse-time?
+      ($ grid-button {:on-click #(! game/set-current-view :world-view)} "👀")
+      ;; ($ grid-button {:on-click #(set-current-view :abilities-view)} "🪄")
+      ($ grid-button {:on-click #(! game/try-to-spawn-snowman)} "⛄")
+      ;; ($ grid-button {:on-click spawn-strange-creature} "🔎")
+      ($ grid-button {:on-click #(! game/set-current-view :inventory-view)} "👜")
+      ;; ($ grid-button {:on-click #(set-current-view :stats-view)} "📜")
+      ($ grid-button {:on-click #(! game/set-current-view :crafting-view)} "🛠")
+      ($ grid-button {:on-click #(! game/spawn-strange-creature)} "👿")
+      ($ grid-button {:on-click #(! game/toggle-reverse-time)} (if reverse-time?
                                                             "←⌛"
                                                             "⌛→"))
       )
     ($ message-log-view {& {:message-log message-log}})))
 ;; ↙
-;; (defnc rect-button [{}])
-;; (d/button {:class "rounded-full bg-gray-300 hover:bg-green-300 py-1"
-;;                           & {:key id
-;;                              :on-click #(! game/try-to-craft id)}}
-;;                          (game/kw->str num id))
 (defnc desc-popup [{:keys [c->e->v mouse-over-relative-coord scroll-pos] :as db}]
   (d/div
     {:class "flex flex-col h-full bg-gray-600 font-mono text-red-200 text-lg"}
@@ -87,7 +80,7 @@
          (str "hp: " (or (get-in c->e->v [:combat (get-player-id db) :hp]) 0)))
     (for [e (game/get-adjacent-entities-with-component db :interact)]
       (let [[char name] (game/entity-components c->e->v e [:char :name])]
-        (d/button {:class "rounded-full  focus:outline-none text-black bg-gray-300 hover:bg-green-300 active:bg-green-400 py-1"
+        ($ button {:class "rounded-full py-1"
                    &      {:key      e
                            :on-click #(! game/interact e)}}
                   (str char " " name))))
@@ -136,7 +129,7 @@
                 "You have:")
            (for [[id recipe] crafting-recipes]
              (let [num (or (get player-inv id) 0)]
-               (d/button {:class "rounded-full bg-gray-300 hover:bg-green-300 active:bg-green-400 py-1"
+               ($ button {:class "rounded-full py-1"
                           & {:key id
                              :on-click #(! game/try-to-craft id)}}
                          (game/kw->str num id)))))))

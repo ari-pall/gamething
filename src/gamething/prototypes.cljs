@@ -59,6 +59,16 @@
             :combat         {:hp     30
                              :damage 1}
             })
+(def dragon {:char           "🐉"
+            :name           "dragon"
+            :enemy-movement true
+            :dragon-attack true
+            :combat         {:hp     60}
+            })
+(def fire {:char           "🔥"
+           :name           "fire"
+           :fire {:dir [1 0]}
+            })
 (def snowman {:name            "snowman"
               :char            "⛄"
               :random-movement true})

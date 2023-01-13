@@ -120,6 +120,9 @@
                       (prob 0.001 ) (-> db
                                         (create-tile p/grass pos)
                                         (create-entity p/enemy pos))
+                      (prob 0.0001 ) (-> db
+                                         (create-tile p/grass pos)
+                                         (create-entity p/dragon pos))
                       (prob 0.01) (-> db
                                        (create-tile p/grass pos)
                                        (create-item :loot pos))
@@ -272,6 +275,41 @@
     (if (<= new-hp 0)
       (kill db e)
       (assoc-in db [:c->e->v :combat e :hp] new-hp))))
+(defn dragon-attack [{:keys [c->e->v time] :as db}]
+  (if (= 0 (mod time 10))
+    (let [affected (keys (c->e->v :dragon-attack))
+        pos-es   (component-values c->e->v :pos affected)]
+    (reduce (fn [db pos]
+              (create-entity db (assoc-in p/fire [:fire :dir] (rand-nth (seq (disj (set (for [x [-1 0 1]
+                                                                                              y [-1 0 1]]
+                                                                                          [x y]))
+                                                                                   [0 0]))))
+                             pos))
+            db
+            pos-es))
+    db))
+(defn fire-move [{:keys [c->e->v] :as db}] ;; [c->e->v e dir]
+  (let [affected (keys (c->e->v :fire))
+        pos-es   (component-values c->e->v :pos affected)
+        dirs     (map #(get % :dir) (component-values c->e->v :fire affected))
+        dests    (map vec+ dirs pos-es)]
+    (reduce (fn [db [e pos [destx desty]]]
+              (if (and (< (abs destx) level-radius)
+                       (< (abs desty) level-radius))
+                (update db :c->e->v container-transfer pos [destx desty] {e 1})
+                (-> db
+                    (update c->e->v remove-all-but e [])
+                    (update-in [:c->e->v :container pos] dissoc e))))
+            db
+            (map vector affected pos-es dests))))
+(defn fire-damage [{:keys [c->e->v] :as db}]
+  (let [affected   (keys (c->e->v :fire))
+        pos-es     (component-values c->e->v :pos affected)
+        player-pos (get-player-pos db)
+        player-id  (get-player-id db)]
+    (if (some #(= % player-pos) pos-es)
+      (harm db player-id 500)
+      db)))
 ;; (defn adjacent? [pos1 pos2]
 ;;   (every? #(<= -1 % 1) (map - pos1 pos2)))
 ;; (concat [1 2] [3 4])
@@ -407,6 +445,9 @@
             (update :time inc)
             (update :c->e->v random-movement)
             player-movement
+            fire-move
+            fire-damage
+            dragon-attack
             enemy-movement
             combat
             )
