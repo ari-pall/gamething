@@ -100,6 +100,8 @@
 (def level-radius 100)
 (defn prob [p] (> p (rand)))
 
+(defn sqrdist [v1 v2]
+  (reduce + (map #(* % %) (map - v1 v2))))
 (defn dist [v1 v2]
   (js/Math.sqrt (reduce + (map #(* % %) (map - v1 v2)))))
 (defn generate-level [db]
@@ -296,13 +298,16 @@
   (let [affected (keys (c->e->v :fire))
         pos-es   (component-values c->e->v :pos affected)
         dirs     (map #(get % :dir) (component-values c->e->v :fire affected))
-        dests    (map vec+ dirs pos-es)]
+        dests    (map vec+ dirs pos-es)
+        player-pos (get-player-pos db)
+        ]
     (reduce (fn [db [e pos [destx desty]]]
               (if (and (< (abs destx) level-radius)
-                       (< (abs desty) level-radius))
+                       (< (abs desty) level-radius)
+                       (< (sqrdist player-pos [destx desty]) 1600))
                 (update db :c->e->v container-transfer-entity pos [destx desty] e)
                 (-> db
-                    (update c->e->v remove-all-but e [])
+                    (update :c->e->v remove-all-but e [])
                     (update-in [:c->e->v :container pos] dissoc e))))
             db
             (map vector affected pos-es dests))))

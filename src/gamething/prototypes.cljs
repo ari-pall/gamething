@@ -63,7 +63,9 @@
             :name           "dragon"
             :enemy-movement true
             :dragon-attack true
-            :combat         {:hp     60}
+            :attack-player  true
+            :combat         {:hp     60
+                             :damage 1}
             })
 (def fire {:char           "🔥"
            :name           "fire"
