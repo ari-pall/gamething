@@ -198,6 +198,11 @@
                     (update-in [:container c2 item-id] + num)))))
           c->e->v
           transaction))
+(defn container-transfer-entity [c->e->v c1 c2 e]
+  (-> c->e->v
+      (assoc-in [:pos e] c2)
+      (update-in [:container c1] dissoc e)
+      (assoc-in [:container c2 e] 1)))
 (defn component-values [c->e->v c es]
   (map (c->e->v c) es))
 (defn entity-components [c->e->v e cs]
@@ -276,17 +281,16 @@
       (kill db e)
       (assoc-in db [:c->e->v :combat e :hp] new-hp))))
 (defn dragon-attack [{:keys [c->e->v time] :as db}]
-  (if (= 0 (mod time 10))
+  (if (= 0 (mod time 30))
     (let [affected (keys (c->e->v :dragon-attack))
-        pos-es   (component-values c->e->v :pos affected)]
-    (reduce (fn [db pos]
-              (create-entity db (assoc-in p/fire [:fire :dir] (rand-nth (seq (disj (set (for [x [-1 0 1]
-                                                                                              y [-1 0 1]]
-                                                                                          [x y]))
-                                                                                   [0 0]))))
-                             pos))
-            db
-            pos-es))
+          pos-es   (component-values c->e->v :pos affected)
+          player-pos (get-player-pos db)
+          ]
+      (reduce (fn [db pos]
+                (create-entity db (assoc-in p/fire [:fire :dir] (mapv #(clamp -1 % 1) (vec- player-pos pos)))
+                               pos))
+              db
+              pos-es))
     db))
 (defn fire-move [{:keys [c->e->v] :as db}] ;; [c->e->v e dir]
   (let [affected (keys (c->e->v :fire))
@@ -296,7 +300,7 @@
     (reduce (fn [db [e pos [destx desty]]]
               (if (and (< (abs destx) level-radius)
                        (< (abs desty) level-radius))
-                (update db :c->e->v container-transfer pos [destx desty] {e 1})
+                (update db :c->e->v container-transfer-entity pos [destx desty] e)
                 (-> db
                     (update c->e->v remove-all-but e [])
                     (update-in [:c->e->v :container pos] dissoc e))))
