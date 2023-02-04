@@ -60,13 +60,13 @@
                              :damage 1}
             })
 (def dragon {:char           "🐉"
-            :name           "dragon"
-            :enemy-movement true
-            :dragon-attack true
-            :attack-player  true
-            :combat         {:hp     60
-                             :damage 1}
-            })
+             :name           "dragon"
+             :enemy-movement true
+             :dragon-attack  true
+             :attack-player  true
+             :combat         {:hp     60
+                              :damage 1}
+             })
 (def fire {:char           "🔥"
            :name           "fire"
            :fire {:dir [1 0]}

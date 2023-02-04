@@ -219,6 +219,7 @@
         takeable-items (map first (filter second (map vector tile-contents (component-values c->e->v :takeable tile-contents))))
         ]
     (container-transfer c->e->v t player-id (zipmap takeable-items (map #(get-in c->e->v [:container t %]) takeable-items)))))
+
 (defn try-to-move [c->e->v e [dirx diry]]
   (let [pos  (get-in c->e->v [:pos e])
         m    (vec+ pos [dirx diry])
@@ -235,7 +236,7 @@
                  (cond (= :wall lt rt) pos
                        (= :wall mt)    (first (rand-nth (filter #(not= :wall (% 1)) [[l lt] [r rt]])))
                        true            m)))]
-    (container-transfer c->e->v pos dest {e 1})))
+    (container-transfer-entity c->e->v pos dest e)))
 (defn random-movement [c->e->v]
   (let [affected (keys (c->e->v :random-movement))]
     (reduce (fn [c->e->v e]
@@ -244,6 +245,15 @@
                 c->e->v))
             c->e->v
             affected)))
+;; (defn random-movement [c->e->v]
+;;   (reduce (fn [c->e->v e]
+;;             (if (prob 0.1)
+;;               (try-to-move c->e->v e (rand-nth [[0 1] [0 -1] [-1 0] [1 0]]))
+;;               c->e->v))
+;;           c->e->v
+;;           (let [affected (keys (c->e->v :random-movement))]
+;;             affected)))
+
 (defn enemy-movement [{:keys [c->e->v] :as db}]
   (let [player-pos (get-player-pos db)
         affected   (keys (c->e->v :enemy-movement))
@@ -289,12 +299,13 @@
           player-pos (get-player-pos db)
           ]
       (reduce (fn [db pos]
-                (create-entity db (assoc-in p/fire [:fire :dir] (mapv #(clamp -1 % 1) (vec- player-pos pos)))
+                (create-entity db
+                               (assoc-in p/fire [:fire :dir] (mapv #(clamp -1 % 1) (vec- player-pos pos)))
                                pos))
               db
               pos-es))
     db))
-(defn fire-move [{:keys [c->e->v] :as db}] ;; [c->e->v e dir]
+(defn fire-move [{:keys [c->e->v] :as db}]
   (let [affected (keys (c->e->v :fire))
         pos-es   (component-values c->e->v :pos affected)
         dirs     (map #(get % :dir) (component-values c->e->v :fire affected))
@@ -324,6 +335,7 @@
 ;; (concat [1 2] [3 4])
 ;; (flatten [[1 2] [3 4]])
 ;; max-key
+
 (defn most [f coll]
   (first (reduce (fn [a b]
                    (max-key second a b))
